@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "fingerprint_algorithm": "canonical-json-sha256-v1",
+  "input_fingerprint": "74523139e7e19d5e9ca4500c07a3fd4b5db9e6e09440036a31ef244ff8f9d0b3",
+  "input": {
+    "schema_version": 1,
+    "case_id": "474c4fd8-3356-4846-8315-eb547f5d533a",
+    "revision": 2,
+    "created_at_ms": 1792454208573,
+    "revised_at_ms": 1792454208747,
+    "vehicle": {
+      "id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+      "name": "Meu Cobalt",
+      "make": "Chevrolet",
+      "model": "Cobalt",
+      "year": 2019,
+      "market": "",
+      "trim": "LTZ",
+      "engine": "",
+      "fuel": "",
+      "transmission": "",
+      "notes": "Veículo informado pelo usuário"
+    },
+    "adapter": "simulador",
+    "dtc_read": {
+      "schema_version": 1,
+      "capture_id": "bbefa481-814e-4864-9e28-8b620f686348",
+      "vehicle_id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+      "session_id": "bd75fcce-6733-4375-af02-076e7dbecd2d",
+      "origin": "SIMULATED",
+      "source_scope": "HEADERLESS_OBD",
+      "ecu_id": null,
+      "started_at": "2026-10-19T23:56:48.471Z",
+      "completed_at": "2026-10-19T23:56:48.471Z",
+      "incomplete": false,
+      "mil": {
+        "outcome": "POSITIVE",
+        "requested_at": "2026-10-19T23:56:48.471Z",
+        "completed_at": "2026-10-19T23:56:48.471Z",
+        "positive_response_count": 1,
+        "negative_responses": [],
+        "detail": "Cenário fictício",
+        "service": "01",
+        "pid": "01",
+        "observations": [
+          {
+            "id": "bbefa481-814e-4864-9e28-8b620f686348:mil:0",
+            "illuminated": true,
+            "reported_dtc_count": 1,
+            "observed_at": "2026-10-19T23:56:48.471Z",
+            "ecu_id": null
+          }
+        ]
+      },
+      "service_results": [
+        {
+          "outcome": "POSITIVE",
+          "requested_at": "2026-10-19T23:56:48.471Z",
+          "completed_at": "2026-10-19T23:56:48.471Z",
+          "positive_response_count": 1,
+          "negative_responses": [],
+          "detail": "Cenário fictício",
+          "service": "03",
+          "category": "STORED",
+          "observations": [
+            {
+              "id": "bbefa481-814e-4864-9e28-8b620f686348:STORED:P0133",
+              "code": "P0133",
+              "category": "STORED",
+              "observed_at": "2026-10-19T23:56:48.471Z",
+              "ecu_id": null
+            }
+          ]
+        },
+        {
+          "outcome": "POSITIVE",
+          "requested_at": "2026-10-19T23:56:48.471Z",
+          "completed_at": "2026-10-19T23:56:48.471Z",
+          "positive_response_count": 1,
+          "negative_responses": [],
+          "detail": "Cenário fictício",
+          "service": "07",
+          "category": "PENDING",
+          "observations": [
+            {
+              "id": "bbefa481-814e-4864-9e28-8b620f686348:PENDING:P0301",
+              "code": "P0301",
+              "category": "PENDING",
+              "observed_at": "2026-10-19T23:56:48.471Z",
+              "ecu_id": null
+            }
+          ]
+        },
+        {
+          "outcome": "POSITIVE",
+          "requested_at": "2026-10-19T23:56:48.471Z",
+          "completed_at": "2026-10-19T23:56:48.471Z",
+          "positive_response_count": 1,
+          "negative_responses": [],
+          "detail": "Cenário fictício",
+          "service": "0A",
+          "category": "PERMANENT",
+          "observations": []
+        }
+      ]
+    },
+    "telemetry": [
+      {
+        "vehicle_id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+        "session_id": "bd75fcce-6733-4375-af02-076e7dbecd2d",
+        "pid": 4,
+        "value": 34.47403959254523,
+        "status": "VALID",
+        "origin": "SIMULATED",
+        "epoch_ms": 1792454208447,
+        "elapsed_ms": 285,
+        "detail": "Cenário fictício"
+      },
+      {
+        "vehicle_id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+        "session_id": "bd75fcce-6733-4375-af02-076e7dbecd2d",
+        "pid": 5,
+        "value": 88.14993750781204,
+        "status": "VALID",
+        "origin": "SIMULATED",
+        "epoch_ms": 1792454208447,
+        "elapsed_ms": 285,
+        "detail": "Cenário fictício"
+      },
+      {
+        "vehicle_id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+        "session_id": "bd75fcce-6733-4375-af02-076e7dbecd2d",
+        "pid": 12,
+        "value": 1573.7019796272614,
+        "status": "VALID",
+        "origin": "SIMULATED",
+        "epoch_ms": 1792454208447,
+        "elapsed_ms": 285,
+        "detail": "Cenário fictício"
+      },
+      {
+        "vehicle_id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+        "session_id": "bd75fcce-6733-4375-af02-076e7dbecd2d",
+        "pid": 13,
+        "value": 43.979231674036185,
+        "status": "VALID",
+        "origin": "SIMULATED",
+        "epoch_ms": 1792454208447,
+        "elapsed_ms": 285,
+        "detail": "Cenário fictício"
+      },
+      {
+        "vehicle_id": "49079278-7af0-4a2b-9a69-9b6406836fb5",
+        "session_id": "bd75fcce-6733-4375-af02-076e7dbecd2d",
+        "pid": 17,
+        "value": 19.48442375552714,
+        "status": "VALID",
+        "origin": "SIMULATED",
+        "epoch_ms": 1792454208447,
+        "elapsed_ms": 285,
+        "detail": "Cenário fictício"
+      }
+    ],
+    "symptoms": {
+      "provenance": "USER_DECLARED",
+      "description": "Falha só com motor frio",
+      "when": "",
+      "frequency": "",
+      "conditions": ""
+    },
+    "readiness": {
+      "status": "NOT_COLLECTED"
+    },
+    "freeze_frame": {
+      "status": "NOT_COLLECTED",
+      "associated_dtc": null
+    }
+  },
+  "analysis": {
+    "analyzer_type": "RULE_ENGINE",
+    "rules_version": "coverage-1",
+    "catalog_version": "none",
+    "status": "INSUFFICIENT_EVIDENCE",
+    "observed": [
+      "SIMULAÇÃO · dados fictícios\nMIL: acesa · 1 falha(s) indicada(s)\nArmazenado: 1 código(s) · resposta positiva\nPendente: 1 código(s) · resposta positiva\nPermanente: 0 código(s) · resposta positiva",
+      "P0133 · Armazenado · observado em 2026-10-19T23:56:48.471Z · evidência bbefa481-814e-4864-9e28-8b620f686348:STORED:P0133",
+      "P0301 · Pendente · observado em 2026-10-19T23:56:48.471Z · evidência bbefa481-814e-4864-9e28-8b620f686348:PENDING:P0301",
+      "Carga calculada: 34.47403959254523 % · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Temperatura do arrefecimento: 88.14993750781204 °C · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Rotação do motor: 1573.7019796272614 rpm · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Velocidade: 43.979231674036185 km\/h · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Posição da borboleta: 19.48442375552714 % · válida na captura · 2026-10-19T23:56:48.447Z"
+    ],
+    "evidence_refs": [
+      "bbefa481-814e-4864-9e28-8b620f686348:STORED:P0133",
+      "bbefa481-814e-4864-9e28-8b620f686348:PENDING:P0301",
+      "bbefa481-814e-4864-9e28-8b620f686348:mil:0",
+      "telemetry:4",
+      "telemetry:5",
+      "telemetry:12",
+      "telemetry:13",
+      "telemetry:17"
+    ],
+    "missing_information": [
+      "Definições técnicas revisadas e fontes aplicáveis para os códigos observados.",
+      "Prontidão dos monitores e quadro congelado não estão anexados em formato estruturado.",
+      "Motor, câmbio ou mercado do veículo ainda não foram informados."
+    ],
+    "hypotheses": [],
+    "checks": [
+      "Consultar documentação aplicável antes de atribuir causas ou indicar peças.",
+      "Se necessário, consultar prontidão e quadro congelado nas ferramentas de leitura; os resultados ainda são separados deste caso."
+    ],
+    "limitations": [
+      "Análise por regras de cobertura coverage-1. Sem modelo de IA e sem hipóteses mecânicas nesta versão.",
+      "Registro histórico. Abrir ou revisar sintomas não atualiza as medições.",
+      "Respostas OBD sem identificação de ECU; não representam cobertura de todos os módulos.",
+      "Dados simulados; nenhum veículo real foi consultado para esta captura."
+    ],
+    "sources_used": [],
+    "report_lines": [
+      "BorbaCar Labs · investigação offline",
+      "Caso: 474c4fd8-3356-4846-8315-eb547f5d533a · revisão 2",
+      "Veículo: Meu Cobalt · Chevrolet Cobalt LTZ 2019 · ID 49079278-7af0-4a2b-9a69-9b6406836fb5",
+      "Motor: não informado · Câmbio: não informado · Mercado: não informado",
+      "Origem: SIMULATED · Sessão: bd75fcce-6733-4375-af02-076e7dbecd2d · Adaptador: simulador",
+      "Coleta DTC: 2026-10-19T23:56:48.471Z a 2026-10-19T23:56:48.471Z",
+      "Caso criado: 2026-10-19T23:56:48.573Z · Revisão: 2026-10-19T23:56:48.747Z",
+      "Sintomas declarados pelo usuário (não são medições)",
+      "Descrição: Falha só com motor frio",
+      "Quando: não informado",
+      "Frequência: não informado",
+      "Condições: não informado",
+      "",
+      "Dados observados",
+      "SIMULAÇÃO · dados fictícios\nMIL: acesa · 1 falha(s) indicada(s)\nArmazenado: 1 código(s) · resposta positiva\nPendente: 1 código(s) · resposta positiva\nPermanente: 0 código(s) · resposta positiva",
+      "P0133 · Armazenado · observado em 2026-10-19T23:56:48.471Z · evidência bbefa481-814e-4864-9e28-8b620f686348:STORED:P0133",
+      "P0301 · Pendente · observado em 2026-10-19T23:56:48.471Z · evidência bbefa481-814e-4864-9e28-8b620f686348:PENDING:P0301",
+      "Carga calculada: 34.47403959254523 % · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Temperatura do arrefecimento: 88.14993750781204 °C · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Rotação do motor: 1573.7019796272614 rpm · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Velocidade: 43.979231674036185 km\/h · válida na captura · 2026-10-19T23:56:48.447Z",
+      "Posição da borboleta: 19.48442375552714 % · válida na captura · 2026-10-19T23:56:48.447Z",
+      "",
+      "Informações ausentes",
+      "Definições técnicas revisadas e fontes aplicáveis para os códigos observados.",
+      "Prontidão dos monitores e quadro congelado não estão anexados em formato estruturado.",
+      "Motor, câmbio ou mercado do veículo ainda não foram informados.",
+      "",
+      "Hipóteses",
+      "Nenhuma hipótese técnica gerada: faltam fontes revisadas.",
+      "",
+      "Verificações",
+      "Consultar documentação aplicável antes de atribuir causas ou indicar peças.",
+      "Se necessário, consultar prontidão e quadro congelado nas ferramentas de leitura; os resultados ainda são separados deste caso.",
+      "",
+      "Fontes técnicas utilizadas",
+      "Nenhuma fonte técnica de causas foi utilizada. Catálogo técnico ainda pendente.",
+      "",
+      "Limitações",
+      "Análise por regras de cobertura coverage-1. Sem modelo de IA e sem hipóteses mecânicas nesta versão.",
+      "Registro histórico. Abrir ou revisar sintomas não atualiza as medições.",
+      "Respostas OBD sem identificação de ECU; não representam cobertura de todos os módulos.",
+      "Dados simulados; nenhum veículo real foi consultado para esta captura."
+    ]
+  }
+}

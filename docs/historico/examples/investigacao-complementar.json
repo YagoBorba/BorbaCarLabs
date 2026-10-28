@@ -1,0 +1,412 @@
+{
+  "schema_version": 2,
+  "fingerprint_algorithm": "canonical-json-sha256-v1",
+  "input_fingerprint": "3a76c43015e2696478b1bee067a27e7613746c97c5bc1bbb0d4a83e68a01618e",
+  "input": {
+    "schema_version": 2,
+    "case_id": "400ea71d-132e-4e9d-93b9-06921f82c70e",
+    "revision": 1,
+    "created_at_ms": 1792454995141,
+    "revised_at_ms": 1792454995141,
+    "vehicle": {
+      "id": "c4b3b085-d96e-4bcb-ab95-761b0f29b684",
+      "name": "Meu Cobalt",
+      "make": "Chevrolet",
+      "model": "Cobalt",
+      "year": 2019,
+      "market": "",
+      "trim": "LTZ",
+      "engine": "",
+      "fuel": "",
+      "transmission": "",
+      "notes": "Veículo informado pelo usuário"
+    },
+    "adapter": "simulador",
+    "dtc_read": {
+      "schema_version": 1,
+      "capture_id": "1a6beb57-83e3-4498-bbf0-511e6655f32a",
+      "vehicle_id": "c4b3b085-d96e-4bcb-ab95-761b0f29b684",
+      "session_id": "449d5267-b29c-469a-abcf-bc237fa1b6bb",
+      "origin": "SIMULATED",
+      "source_scope": "HEADERLESS_OBD",
+      "ecu_id": null,
+      "started_at": "2026-10-20T00:09:55.038Z",
+      "completed_at": "2026-10-20T00:09:55.038Z",
+      "incomplete": false,
+      "mil": {
+        "outcome": "POSITIVE",
+        "requested_at": "2026-10-20T00:09:55.038Z",
+        "completed_at": "2026-10-20T00:09:55.038Z",
+        "positive_response_count": 1,
+        "negative_responses": [],
+        "detail": "Cenário fictício",
+        "service": "01",
+        "pid": "01",
+        "observations": [
+          {
+            "id": "1a6beb57-83e3-4498-bbf0-511e6655f32a:mil:0",
+            "illuminated": true,
+            "reported_dtc_count": 1,
+            "observed_at": "2026-10-20T00:09:55.038Z",
+            "ecu_id": null
+          }
+        ]
+      },
+      "service_results": [
+        {
+          "outcome": "POSITIVE",
+          "requested_at": "2026-10-20T00:09:55.038Z",
+          "completed_at": "2026-10-20T00:09:55.038Z",
+          "positive_response_count": 1,
+          "negative_responses": [],
+          "detail": "Cenário fictício",
+          "service": "03",
+          "category": "STORED",
+          "observations": [
+            {
+              "id": "1a6beb57-83e3-4498-bbf0-511e6655f32a:STORED:P0133",
+              "code": "P0133",
+              "category": "STORED",
+              "observed_at": "2026-10-20T00:09:55.038Z",
+              "ecu_id": null
+            }
+          ]
+        },
+        {
+          "outcome": "POSITIVE",
+          "requested_at": "2026-10-20T00:09:55.038Z",
+          "completed_at": "2026-10-20T00:09:55.038Z",
+          "positive_response_count": 1,
+          "negative_responses": [],
+          "detail": "Cenário fictício",
+          "service": "07",
+          "category": "PENDING",
+          "observations": [
+            {
+              "id": "1a6beb57-83e3-4498-bbf0-511e6655f32a:PENDING:P0301",
+              "code": "P0301",
+              "category": "PENDING",
+              "observed_at": "2026-10-20T00:09:55.038Z",
+              "ecu_id": null
+            }
+          ]
+        },
+        {
+          "outcome": "POSITIVE",
+          "requested_at": "2026-10-20T00:09:55.038Z",
+          "completed_at": "2026-10-20T00:09:55.038Z",
+          "positive_response_count": 1,
+          "negative_responses": [],
+          "detail": "Cenário fictício",
+          "service": "0A",
+          "category": "PERMANENT",
+          "observations": []
+        }
+      ]
+    },
+    "telemetry": [],
+    "symptoms": {
+      "provenance": "USER_DECLARED",
+      "description": "",
+      "when": "",
+      "frequency": "",
+      "conditions": ""
+    },
+    "supplement": {
+      "schema_version": 1,
+      "capture_id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70",
+      "vehicle_id": "c4b3b085-d96e-4bcb-ab95-761b0f29b684",
+      "session_id": "449d5267-b29c-469a-abcf-bc237fa1b6bb",
+      "origin": "SIMULATED",
+      "source_scope": "HEADERLESS_OBD",
+      "ecu_id": null,
+      "started_at_ms": 1792454995059,
+      "completed_at_ms": 1792454995059,
+      "readiness": {
+        "outcome": "POSITIVE",
+        "requested_at": "2026-10-20T00:09:55.059Z",
+        "completed_at": "2026-10-20T00:09:55.059Z",
+        "positive_response_count": 1,
+        "negative_responses": [],
+        "detail": "Cenário fictício",
+        "service": "01",
+        "pid": 1,
+        "observations": [
+          {
+            "id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:ready:0",
+            "a": 129,
+            "b": 7,
+            "c": 5,
+            "d": 4,
+            "observed_at_ms": 1792454995059
+          }
+        ]
+      },
+      "freeze_frame": {
+        "frame_number": 0,
+        "associated_dtc": null,
+        "association_status": "UNKNOWN_ECU_NOT_IDENTIFIED",
+        "frozen_at": null,
+        "pids": [
+          {
+            "outcome": "POSITIVE",
+            "requested_at": "2026-10-20T00:09:55.059Z",
+            "completed_at": "2026-10-20T00:09:55.059Z",
+            "positive_response_count": 1,
+            "negative_responses": [],
+            "detail": "Cenário fictício",
+            "service": "02",
+            "pid": 12,
+            "observations": [
+              {
+                "id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:12:0",
+                "value": 1450,
+                "observed_at_ms": 1792454995059
+              }
+            ]
+          },
+          {
+            "outcome": "POSITIVE",
+            "requested_at": "2026-10-20T00:09:55.059Z",
+            "completed_at": "2026-10-20T00:09:55.059Z",
+            "positive_response_count": 1,
+            "negative_responses": [],
+            "detail": "Cenário fictício",
+            "service": "02",
+            "pid": 13,
+            "observations": [
+              {
+                "id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:13:0",
+                "value": 0,
+                "observed_at_ms": 1792454995059
+              }
+            ]
+          },
+          {
+            "outcome": "POSITIVE",
+            "requested_at": "2026-10-20T00:09:55.059Z",
+            "completed_at": "2026-10-20T00:09:55.059Z",
+            "positive_response_count": 1,
+            "negative_responses": [],
+            "detail": "Cenário fictício",
+            "service": "02",
+            "pid": 5,
+            "observations": [
+              {
+                "id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:5:0",
+                "value": 88,
+                "observed_at_ms": 1792454995059
+              }
+            ]
+          },
+          {
+            "outcome": "POSITIVE",
+            "requested_at": "2026-10-20T00:09:55.059Z",
+            "completed_at": "2026-10-20T00:09:55.059Z",
+            "positive_response_count": 1,
+            "negative_responses": [],
+            "detail": "Cenário fictício",
+            "service": "02",
+            "pid": 4,
+            "observations": [
+              {
+                "id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:4:0",
+                "value": 32,
+                "observed_at_ms": 1792454995059
+              }
+            ]
+          },
+          {
+            "outcome": "POSITIVE",
+            "requested_at": "2026-10-20T00:09:55.059Z",
+            "completed_at": "2026-10-20T00:09:55.059Z",
+            "positive_response_count": 1,
+            "negative_responses": [],
+            "detail": "Cenário fictício",
+            "service": "02",
+            "pid": 17,
+            "observations": [
+              {
+                "id": "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:17:0",
+                "value": 18,
+                "observed_at_ms": 1792454995059
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "analysis": {
+    "analyzer_type": "RULE_ENGINE",
+    "rules_version": "coverage-2",
+    "catalog_version": "none",
+    "status": "INSUFFICIENT_EVIDENCE",
+    "observed": [
+      "SIMULAÇÃO · dados fictícios\nMIL: acesa · 1 falha(s) indicada(s)\nArmazenado: 1 código(s) · resposta positiva\nPendente: 1 código(s) · resposta positiva\nPermanente: 0 código(s) · resposta positiva",
+      "P0133 · Armazenado · observado em 2026-10-20T00:09:55.038Z · evidência 1a6beb57-83e3-4498-bbf0-511e6655f32a:STORED:P0133",
+      "P0301 · Pendente · observado em 2026-10-20T00:09:55.038Z · evidência 1a6beb57-83e3-4498-bbf0-511e6655f32a:PENDING:P0301",
+      "COMPLEMENTO SIMULADO",
+      "Consulta: 2026-10-20T00:09:55.059Z a 2026-10-20T00:09:55.059Z",
+      "Prontidão desde apagar DTCs: resposta positiva",
+      "Resposta 1 · MIL acesa · contagem indicada 1 · coletada em 2026-10-20T00:09:55.059Z",
+      "Falhas de ignição: pronto",
+      "Sistema de combustível: pronto",
+      "Componentes abrangentes: pronto",
+      "Catalisador: pronto",
+      "Catalisador aquecido: não suportado",
+      "Sistema evaporativo: não concluído",
+      "Ar secundário: não suportado",
+      "Refrigerante do ar-condicionado: não suportado",
+      "Sondas de oxigênio: não suportado",
+      "Aquecimento das sondas: não suportado",
+      "EGR\/VVT: não suportado",
+      "Quadro congelado 00 · código associado desconhecido; sem identificação de ECU",
+      "Rotação do motor: resposta positiva",
+      "  Resposta 1: 1450.0 rpm · coletada em 2026-10-20T00:09:55.059Z",
+      "Velocidade: resposta positiva",
+      "  Resposta 1: 0.0 km\/h · coletada em 2026-10-20T00:09:55.059Z",
+      "Temperatura do arrefecimento: resposta positiva",
+      "  Resposta 1: 88.0 °C · coletada em 2026-10-20T00:09:55.059Z",
+      "Carga calculada: resposta positiva",
+      "  Resposta 1: 32.0 % · coletada em 2026-10-20T00:09:55.059Z",
+      "Posição da borboleta: resposta positiva",
+      "  Resposta 1: 18.0 % · coletada em 2026-10-20T00:09:55.059Z",
+      "Horários indicam a coleta pelo app. Instante original do congelamento desconhecido; valores não são leituras ao vivo."
+    ],
+    "evidence_refs": [
+      "1a6beb57-83e3-4498-bbf0-511e6655f32a:STORED:P0133",
+      "1a6beb57-83e3-4498-bbf0-511e6655f32a:PENDING:P0301",
+      "1a6beb57-83e3-4498-bbf0-511e6655f32a:mil:0",
+      "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:ready:0",
+      "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:12:0",
+      "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:13:0",
+      "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:5:0",
+      "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:4:0",
+      "e0a26ce3-146f-4d12-afb8-2d76a22c6a70:frame00:17:0"
+    ],
+    "missing_information": [
+      "Definições técnicas revisadas e fontes aplicáveis para os códigos observados.",
+      "Sintomas e condições ainda não informados.",
+      "Telemetria da mesma sessão não foi anexada.",
+      "1 indicação(ões) de monitor não concluído nas respostas de prontidão.",
+      "Motor, câmbio ou mercado do veículo ainda não foram informados."
+    ],
+    "hypotheses": [],
+    "checks": [
+      "Consultar documentação aplicável antes de atribuir causas ou indicar peças.",
+      "Informar o que foi percebido, quando ocorre e com que frequência.",
+      "Consultar as condições de conclusão dos monitores na documentação aplicável; este resultado não é aprovação de inspeção nem confirmação de peça defeituosa."
+    ],
+    "limitations": [
+      "Consultas complementares e DTCs têm janelas próprias; não se presume simultaneidade nem correspondência entre ECUs das respostas.",
+      "Análise por regras de cobertura coverage-2. Sem modelo de IA e sem hipóteses mecânicas nesta versão.",
+      "Registro histórico. Abrir ou revisar sintomas não atualiza as medições.",
+      "Respostas OBD sem identificação de ECU; não representam cobertura de todos os módulos.",
+      "Dados simulados; nenhum veículo real foi consultado para esta captura."
+    ],
+    "sources_used": [],
+    "report_lines": [
+      "BorbaCar Labs · investigação offline",
+      "Caso: 400ea71d-132e-4e9d-93b9-06921f82c70e · revisão 1",
+      "Veículo: Meu Cobalt · Chevrolet Cobalt LTZ 2019 · ID c4b3b085-d96e-4bcb-ab95-761b0f29b684",
+      "Motor: não informado · Câmbio: não informado · Mercado: não informado",
+      "Origem: SIMULATED · Sessão: 449d5267-b29c-469a-abcf-bc237fa1b6bb · Adaptador: simulador",
+      "Coleta DTC: 2026-10-20T00:09:55.038Z a 2026-10-20T00:09:55.038Z",
+      "Caso criado: 2026-10-20T00:09:55.141Z · Revisão: 2026-10-20T00:09:55.141Z",
+      "Sintomas declarados pelo usuário (não são medições)",
+      "Descrição: não informado",
+      "Quando: não informado",
+      "Frequência: não informado",
+      "Condições: não informado",
+      "",
+      "Dados observados",
+      "SIMULAÇÃO · dados fictícios\nMIL: acesa · 1 falha(s) indicada(s)\nArmazenado: 1 código(s) · resposta positiva\nPendente: 1 código(s) · resposta positiva\nPermanente: 0 código(s) · resposta positiva",
+      "P0133 · Armazenado · observado em 2026-10-20T00:09:55.038Z · evidência 1a6beb57-83e3-4498-bbf0-511e6655f32a:STORED:P0133",
+      "P0301 · Pendente · observado em 2026-10-20T00:09:55.038Z · evidência 1a6beb57-83e3-4498-bbf0-511e6655f32a:PENDING:P0301",
+      "COMPLEMENTO SIMULADO",
+      "Consulta: 2026-10-20T00:09:55.059Z a 2026-10-20T00:09:55.059Z",
+      "Prontidão desde apagar DTCs: resposta positiva",
+      "Resposta 1 · MIL acesa · contagem indicada 1 · coletada em 2026-10-20T00:09:55.059Z",
+      "Falhas de ignição: pronto",
+      "Sistema de combustível: pronto",
+      "Componentes abrangentes: pronto",
+      "Catalisador: pronto",
+      "Catalisador aquecido: não suportado",
+      "Sistema evaporativo: não concluído",
+      "Ar secundário: não suportado",
+      "Refrigerante do ar-condicionado: não suportado",
+      "Sondas de oxigênio: não suportado",
+      "Aquecimento das sondas: não suportado",
+      "EGR\/VVT: não suportado",
+      "Quadro congelado 00 · código associado desconhecido; sem identificação de ECU",
+      "Rotação do motor: resposta positiva",
+      "  Resposta 1: 1450.0 rpm · coletada em 2026-10-20T00:09:55.059Z",
+      "Velocidade: resposta positiva",
+      "  Resposta 1: 0.0 km\/h · coletada em 2026-10-20T00:09:55.059Z",
+      "Temperatura do arrefecimento: resposta positiva",
+      "  Resposta 1: 88.0 °C · coletada em 2026-10-20T00:09:55.059Z",
+      "Carga calculada: resposta positiva",
+      "  Resposta 1: 32.0 % · coletada em 2026-10-20T00:09:55.059Z",
+      "Posição da borboleta: resposta positiva",
+      "  Resposta 1: 18.0 % · coletada em 2026-10-20T00:09:55.059Z",
+      "Horários indicam a coleta pelo app. Instante original do congelamento desconhecido; valores não são leituras ao vivo.",
+      "",
+      "Informações ausentes",
+      "Definições técnicas revisadas e fontes aplicáveis para os códigos observados.",
+      "Sintomas e condições ainda não informados.",
+      "Telemetria da mesma sessão não foi anexada.",
+      "1 indicação(ões) de monitor não concluído nas respostas de prontidão.",
+      "Motor, câmbio ou mercado do veículo ainda não foram informados.",
+      "",
+      "Hipóteses",
+      "Nenhuma hipótese técnica gerada: faltam fontes revisadas.",
+      "",
+      "Verificações",
+      "Consultar documentação aplicável antes de atribuir causas ou indicar peças.",
+      "Informar o que foi percebido, quando ocorre e com que frequência.",
+      "Consultar as condições de conclusão dos monitores na documentação aplicável; este resultado não é aprovação de inspeção nem confirmação de peça defeituosa.",
+      "",
+      "Fontes técnicas utilizadas",
+      "Nenhuma fonte técnica de causas foi utilizada. Catálogo técnico ainda pendente.",
+      "",
+      "Referências de protocolo e codificação · protocol-links-1",
+      "ELM327 datasheet · Elm Electronics · ELM327DSK \/ v2.2\nhttps:\/\/www.elmelectronics.com\/wp-content\/uploads\/2017\/01\/ELM327DS.pdf\nSeção: Talking to the Vehicle; Interpreting Trouble Codes · consulta 2026-10-19\nEscopo: GENERIC_ELM_OBD_PROTOCOL\nLocalização e escopo consultados; sem ensaio de compatibilidade do adaptador ou veículo\nSomente metadados e link; documento\/texto técnico não redistribuído.",
+      "OBD2 PID Overview · CSS Electronics · Página sem versão editorial; consulta em 2026-10-19\nhttps:\/\/www.csselectronics.com\/pages\/obd2-pid-table-on-board-diagnostics-j1979\nSeção: OBD2 PID table; RPM conversion example · consulta 2026-10-19\nEscopo: GENERIC_SERVICE01_ENCODING\nReferência de codificação dos PIDs existentes; não contém limites mecânicos confirmados do Cobalt\nSomente metadados e link; documento\/texto técnico não redistribuído.",
+      "",
+      "Limitações",
+      "Consultas complementares e DTCs têm janelas próprias; não se presume simultaneidade nem correspondência entre ECUs das respostas.",
+      "Análise por regras de cobertura coverage-2. Sem modelo de IA e sem hipóteses mecânicas nesta versão.",
+      "Registro histórico. Abrir ou revisar sintomas não atualiza as medições.",
+      "Respostas OBD sem identificação de ECU; não representam cobertura de todos os módulos.",
+      "Dados simulados; nenhum veículo real foi consultado para esta captura."
+    ],
+    "protocol_sources_version": "protocol-links-1",
+    "protocol_sources": [
+      {
+        "id": "elm327-dsk",
+        "title": "ELM327 datasheet",
+        "publisher": "Elm Electronics",
+        "version": "ELM327DSK \/ v2.2",
+        "location": "https:\/\/www.elmelectronics.com\/wp-content\/uploads\/2017\/01\/ELM327DS.pdf",
+        "section": "Talking to the Vehicle; Interpreting Trouble Codes",
+        "accessed_on": "2026-10-19",
+        "scope": "GENERIC_ELM_OBD_PROTOCOL",
+        "review": "Localização e escopo consultados; sem ensaio de compatibilidade do adaptador ou veículo",
+        "distribution": "LINK_METADATA_ONLY"
+      },
+      {
+        "id": "css-pid-table",
+        "title": "OBD2 PID Overview",
+        "publisher": "CSS Electronics",
+        "version": "Página sem versão editorial; consulta em 2026-10-19",
+        "location": "https:\/\/www.csselectronics.com\/pages\/obd2-pid-table-on-board-diagnostics-j1979",
+        "section": "OBD2 PID table; RPM conversion example",
+        "accessed_on": "2026-10-19",
+        "scope": "GENERIC_SERVICE01_ENCODING",
+        "review": "Referência de codificação dos PIDs existentes; não contém limites mecânicos confirmados do Cobalt",
+        "distribution": "LINK_METADATA_ONLY"
+      }
+    ]
+  }
+}

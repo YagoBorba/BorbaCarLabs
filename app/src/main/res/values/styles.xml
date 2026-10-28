@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="BaseAppTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#ff0b1220</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:alertDialogTheme">@style/BorbaDialogDark</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#ff55e6c1</item>
+        <item name="android:statusBarColor">#ff0b1220</item>
+        <item name="android:navigationBarColor">#ff0b1220</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="AppTheme" parent="BaseAppTheme" />
+
+    <style name="LightAppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#fff4f7fa</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:alertDialogTheme">@style/BorbaDialogLight</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#ff006b55</item>
+        <item name="android:statusBarColor">#fff4f7fa</item>
+        <item name="android:navigationBarColor">#fff4f7fa</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="BorbaDialogDark" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorBackground">#ff151f30</item>
+        <item name="android:textColorPrimary">#fff1f5fb</item>
+        <item name="android:textColorSecondary">#ff99aac2</item>
+        <item name="android:windowBackground">@drawable/dialog_dark</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#ff55e6c1</item>
+    </style>
+
+    <style name="BorbaDialogLight" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorBackground">#ffffffff</item>
+        <item name="android:textColorPrimary">#ff172638</item>
+        <item name="android:textColorSecondary">#ff4b5c70</item>
+        <item name="android:windowBackground">@drawable/dialog_light</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#ff006b55</item>
+    </style>
+</resources>
