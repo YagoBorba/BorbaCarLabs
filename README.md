@@ -1,7 +1,7 @@
 # BorbaCar Labs
 
 Leitor de diagnóstico OBD2 para Android, em Java, com caderno do carro e análise por IA opcional.
-Projeto acadêmico, versão 1.0.1 (pacote `io.rea.obd`).
+Projeto acadêmico, versão 1.0.2 (pacote `io.rea.obd`).
 
 | Hoje | Diagnóstico | Diário | Ao vivo |
 |---|---|---|---|

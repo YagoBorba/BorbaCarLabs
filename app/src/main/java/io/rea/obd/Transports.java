@@ -1,5 +1,6 @@
 package io.rea.obd;
 
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -26,6 +27,7 @@ public final class Transports {
     private Transports() {
     }
 
+    @SuppressLint("MissingPermission")
     public static final class Classic implements ElmTransport {
         private final BluetoothAdapter adapter;
         private volatile boolean closed;
@@ -140,6 +142,7 @@ public final class Transports {
         }
     }
 
+    @SuppressLint("MissingPermission")
     public static final class Ble implements ElmTransport {
         private static final UUID CCC = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
         private volatile boolean closed;

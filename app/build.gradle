@@ -10,8 +10,8 @@ android {
         applicationId "io.rea.obd"
         minSdk 26
         targetSdk 35
-        versionCode 21
-        versionName "1.0.1"
+        versionCode 22
+        versionName "1.0.2"
     }
 
     def keystoreFile = rootProject.file("keystore.properties")
@@ -61,6 +61,6 @@ android {
 
 dependencies {
     testImplementation "junit:junit:4.13.2"
-    testImplementation "org.robolectric:robolectric:4.14.1"
-    testImplementation "org.json:json:20240303"
+    testImplementation "org.robolectric:robolectric:4.17"
+    testImplementation "org.json:json:20260814"
 }
