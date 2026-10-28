@@ -1,5 +1,11 @@
 # Histórico de alterações
 
+## 1.0.2 / Ferramentas — 28/10/2026
+
+- Android Gradle Plugin 8.13.2 e Gradle 8.14.6; o lint mais rígido dessa versão passa sem erros, com as chamadas Bluetooth marcadas onde a permissão já foi pedida pela tela de conexão.
+- Testes com Robolectric 4.17 e org.json 20260814. 62 testes.
+- Nenhuma mudança visível no app.
+
 ## 1.0.1 / Manutenção — 28/10/2026
 
 - Lint do Android sem nenhum aviso: gráfico e ilustração reaproveitam objetos de desenho em vez de criá-los a cada quadro; regras de backup explícitas mantêm casos e diário só no aparelho.
