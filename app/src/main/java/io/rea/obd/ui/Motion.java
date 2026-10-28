@@ -1,6 +1,7 @@
 package io.rea.obd.ui;
 
 import android.animation.ValueAnimator;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.view.MotionEvent;
 import android.view.View;
@@ -32,6 +33,7 @@ public final class Motion {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     public static void press(View view) {
         view.setStateListAnimator(null);
         view.setScaleX(1.0f);
