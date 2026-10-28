@@ -3,8 +3,8 @@
 ## 1.0.1 / Manutenção — 28/10/2026
 
 - Lint do Android sem nenhum aviso: gráfico e ilustração reaproveitam objetos de desenho em vez de criá-los a cada quadro; regras de backup explícitas mantêm casos e diário só no aparelho.
-- CI com as versões atuais das actions (fim do Node 20 no GitHub) e rodando também em .
-- Fluxo de trabalho com , branches de feature/correção e release documentado no README; Dependabot abre as atualizações contra .
+- CI com as versões atuais das actions (fim do Node 20 no GitHub) e rodando também em `develop`.
+- Fluxo de trabalho com `develop`, branches de feature/correção e release documentado no README; Dependabot abre as atualizações contra `develop`.
 
 ## 1.0.0 / Profissional — 27/10/2026
 
