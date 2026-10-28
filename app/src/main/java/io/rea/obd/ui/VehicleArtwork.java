@@ -8,17 +8,20 @@ import android.view.View;
 
 public final class VehicleArtwork extends View {
     private final Paint ink;
+    private final Path path;
     private final ThemePalette palette;
 
     public VehicleArtwork(Context context) {
         super(context);
         this.ink = new Paint(1);
+        this.path = new Path();
         this.palette = ThemePalette.of(context);
         setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
 
     private void line(Canvas canvas, float... value) {
-        Path path = new Path();
+        Path path = this.path;
+        path.reset();
         path.moveTo(value[0], value[1]);
         for (int i = 2; i < value.length; i += 2) {
             path.lineTo(value[i], value[i + 1]);
@@ -47,7 +50,8 @@ public final class VehicleArtwork extends View {
         line(canvas, 180.0f, 7.0f, 180.0f, 21.0f);
         this.ink.setAlpha(255);
         this.ink.setStrokeWidth(2.2f);
-        Path path = new Path();
+        Path path = this.path;
+        path.reset();
         path.moveTo(35.0f, 99.0f);
         path.cubicTo(39.0f, 84.0f, 53.0f, 79.0f, 87.0f, 74.0f);
         path.lineTo(128.0f, 40.0f);

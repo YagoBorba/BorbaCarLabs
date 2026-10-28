@@ -1,7 +1,7 @@
 # BorbaCar Labs
 
 Leitor de diagnóstico OBD2 para Android, em Java, com caderno do carro e análise por IA opcional.
-Projeto acadêmico, versão 1.0.0 (pacote `io.rea.obd`).
+Projeto acadêmico, versão 1.0.1 (pacote `io.rea.obd`).
 
 | Hoje | Diagnóstico | Diário | Ao vivo |
 |---|---|---|---|
@@ -112,3 +112,11 @@ Copie `keystore.properties.example` para `keystore.properties` (fora do Git), pr
 certificado do app e rode `./gradlew assembleRelease`. Sem esse arquivo o release sai sem assinatura.
 Pelo GitHub, um tag `v*` dispara o workflow de release, que assina o APK quando os segredos
 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` e `KEY_PASSWORD` estão configurados.
+
+## Fluxo de trabalho
+
+- `main` guarda só versões publicadas; cada merge nela recebe um tag `vX.Y.Z`.
+- `develop` reúne o que vai para a próxima versão.
+- Novidades e correções saem de `develop` em `feature/…` ou `fix/…` e voltam por pull request.
+- Uma versão nasce em `release/X.Y.Z`, a partir de `develop`, onde se ajusta número e CHANGELOG; o PR vai para `main` e depois `main` volta para `develop`.
+- O CI roda em todo pull request e nos pushes de `main` e `develop`; o Dependabot abre as atualizações contra `develop`.

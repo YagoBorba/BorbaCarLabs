@@ -17,7 +17,6 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -25,9 +24,11 @@ import java.util.TimeZone;
 
 public final class ChartView extends View {
     private SelectionListener listener;
+    private final SimpleDateFormat clock;
     private final Paint paint;
     private final ThemePalette palette;
     private List<Point> points;
+    private final Path trace;
     private int selected;
     private String unit;
 
@@ -54,6 +55,9 @@ public final class ChartView extends View {
     public ChartView(Context context) {
         super(context);
         this.paint = new Paint(1);
+        this.trace = new Path();
+        this.clock = new SimpleDateFormat("HH:mm:ss", Locale.ROOT);
+        this.clock.setTimeZone(TimeZone.getTimeZone("UTC"));
         this.points = Collections.emptyList();
         this.unit = "";
         this.selected = -1;
@@ -202,18 +206,16 @@ public final class ChartView extends View {
             float value2 = sp + ((i * max2) / 2.0f);
             canvas.drawLine(left, value2, getWidth(), value2, this.paint);
             i++;
-            max = max;
         }
         this.paint.setColor(this.palette.muted);
         canvas.drawText(String.format(Locale.getDefault(), "%.0f", Double.valueOf(max)), 0.0f, sp(4.0f) + sp, this.paint);
         canvas.drawText(String.format(Locale.getDefault(), "%.0f", Double.valueOf(min)), 0.0f, height, this.paint);
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm:ss", Locale.ROOT);
-        simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-        String text = simpleDateFormat.format(new Date(start()));
-        String text2 = simpleDateFormat.format(new Date(end()));
+        String text = this.clock.format(start());
+        String text2 = this.clock.format(end());
         canvas.drawText(text, 0.0f, getHeight() - dp(2.0f), this.paint);
         canvas.drawText(text2, Math.max(0.0f, getWidth() - this.paint.measureText(text2)), getHeight() - dp(2.0f), this.paint);
-        Path path = new Path();
+        Path path = this.trace;
+        path.reset();
         for (int i2 = 0; i2 < this.points.size(); i2++) {
             Point points = this.points.get(i2);
             float x = x(points);

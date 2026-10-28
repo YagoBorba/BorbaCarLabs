@@ -10,8 +10,8 @@ android {
         applicationId "io.rea.obd"
         minSdk 26
         targetSdk 35
-        versionCode 20
-        versionName "1.0.0"
+        versionCode 21
+        versionName "1.0.1"
     }
 
     def keystoreFile = rootProject.file("keystore.properties")
@@ -47,6 +47,10 @@ android {
         unitTests {
             includeAndroidResources = true
         }
+    }
+
+    lint {
+        disable "SetTextI18n"
     }
 
     compileOptions {

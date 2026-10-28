@@ -2,15 +2,23 @@ version: 2
 updates:
   - package-ecosystem: gradle
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: com.android.application
+        update-types: ["version-update:semver-major"]
+      - dependency-name: gradle-wrapper
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /server
+    target-branch: develop
     schedule:
       interval: monthly
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
