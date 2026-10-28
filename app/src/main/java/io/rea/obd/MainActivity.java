@@ -1,5 +1,6 @@
 package io.rea.obd;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -1507,6 +1508,7 @@ public final class MainActivity extends Activity {
             }
 
             @Override
+            @SuppressLint("MissingPermission")
             public void onScanResult(int i, ScanResult scanResult) {
                 BluetoothDevice device;
                 if (MainActivity.this.bleCallback != this || (device = scanResult.getDevice()) == null || map.containsKey(device.getAddress())) {
