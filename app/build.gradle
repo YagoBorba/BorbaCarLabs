@@ -1,0 +1,62 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "io.rea.obd"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "io.rea.obd"
+        minSdk 26
+        targetSdk 35
+        versionCode 20
+        versionName "1.0.0"
+    }
+
+    def keystoreFile = rootProject.file("keystore.properties")
+    if (keystoreFile.exists()) {
+        def keystore = new Properties()
+        keystoreFile.withInputStream { keystore.load(it) }
+        signingConfigs {
+            release {
+                storeFile file(keystore["storeFile"])
+                storePassword keystore["storePassword"]
+                keyAlias keystore["keyAlias"]
+                keyPassword keystore["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".teste"
+            versionNameSuffix "-teste"
+            manifestPlaceholders = [appLabel: "BorbaCar Labs (teste)"]
+        }
+        release {
+            manifestPlaceholders = [appLabel: "BorbaCar Labs"]
+            minifyEnabled false
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.14.1"
+    testImplementation "org.json:json:20240303"
+}
