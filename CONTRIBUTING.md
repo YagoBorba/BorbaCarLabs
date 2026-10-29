@@ -1,10 +1,10 @@
 # Contributing to BorbaCar Labs
 
-## 🎯 Overview
+## Overview
 
 BorbaCar Labs is an Android OBD-II diagnostic app written in Java. This guide covers the branch model, local setup, commit messages and the pull request process.
 
-## 🌿 Git Workflow (GitFlow)
+## Git Workflow (GitFlow)
 
 ### Main Branches
 
@@ -39,7 +39,7 @@ git push origin v1.0.3
 git switch develop && git merge --no-ff main && git push
 ```
 
-## 💻 Development Environment Setup
+## Development Environment Setup
 
 ### Prerequisites
 
@@ -57,7 +57,7 @@ cd BorbaCarLabs
 
 Demo mode lets you go through every screen without a car or adapter.
 
-## 🏗️ Project Architecture
+## Project Architecture
 
 - The OBD stack (`ElmSession`, `ObdReader`, `ObdParser`, `Transports`) only sends read-only queries; clearing codes lives in `EmissionCodeReset` and always asks for confirmation.
 - The rules engine and the AI receive data, never commands, and never reach the transport.
@@ -65,16 +65,16 @@ Demo mode lets you go through every screen without a car or adapter.
 - Simulated data is always labeled as simulated, on screen and in reports.
 - Saved cases are recalculated and compared byte by byte when opened, so catalogs and rules used by a saved case are versioned and frozen.
 
-## 📝 Commit Convention
+## Commit Convention
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/) with emojis, in English. See the [Commit Convention](.github/COMMIT_CONVENTION.md) for types, scopes and examples.
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/), in English and without emojis. See the [Commit Convention](.github/COMMIT_CONVENTION.md) for types, scopes and examples.
 
 ```bash
-✨ feat(journal): add service reminders by mileage
-🐛 fix(reports): keep page breaks inside the freeze frame table
+feat(journal): add service reminders by mileage
+fix(reports): keep page breaks inside the freeze frame table
 ```
 
-## 🔄 Pull Request Process
+## Pull Request Process
 
 ### Before Submitting
 
@@ -87,7 +87,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/) with
 
 The CI must be green before merging. Pull requests are merged with a merge commit and the branch is deleted afterwards.
 
-## 🧪 Testing
+## Testing
 
 ```bash
 ./gradlew testDebugUnitTest        # JVM and Robolectric tests
@@ -97,18 +97,18 @@ The CI must be green before merging. Pull requests are merged with a merge commi
 - `FakeAdapter` plays scripted ELM327 responses for the OBD tests.
 - `ScreensTest` opens the real `MainActivity` with Robolectric and saves screenshots to `app/build/screenshots/`.
 
-## 🎨 Code Standards
+## Code Standards
 
 - Java 17, Android SDK only (no external runtime libraries).
 - Views are built in code through `UiKit` and `ThemePalette`.
 - Use Android constants (`View.GONE`, `Gravity.CENTER`, ...) instead of raw numbers.
 - Keep user-facing text in Brazilian Portuguese.
 
-## 🐛 Reporting Issues
+## Reporting Issues
 
 Open an issue with the app version, Android version, adapter model and connection type, the steps to reproduce and, when possible, the exported case JSON.
 
-## 📬 Contact
+## Contact
 
 - Email: yagoaborba@hotmail.com
 - LinkedIn: https://www.linkedin.com/in/yagoborba/

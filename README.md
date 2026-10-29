@@ -35,7 +35,7 @@
 
 </div>
 
-## ❤️ About the Project
+## About the Project
 
 > [!IMPORTANT]
 > BorbaCar Labs is an Android OBD-II diagnostic app written in Java. It reads the car through an ELM327 adapter, explains what it found in plain language and keeps a traceable record of every reading, so a diagnosis can always be checked back against its evidence.
@@ -52,39 +52,39 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 
 </div>
 
-## ✨ What Can BorbaCar Labs Do?
+## What Can BorbaCar Labs Do?
 
-- 🔌 **Adapter Connection:**
+- **Adapter Connection:**
     Connects to ELM327 adapters over Bluetooth Classic, Bluetooth Low Energy or Wi-Fi, with automatic protocol detection.
 
-- 🩺 **Guided Reading:**
+- **Guided Reading:**
     Reads stored, pending and permanent trouble codes, the check engine light, readiness monitors and freeze frame, and ends with a clear verdict ("No trouble codes", "2 codes found").
 
-- 📈 **Live Data:**
+- **Live Data:**
     Up to six sensors at once with status and timestamp for every sample, an RPM chart and CSV recording.
 
-- 🔎 **Investigations:**
+- **Investigations:**
     Cases with declared symptoms, revisions, an offline rules engine, a verification checklist and traceable JSON, TXT and PDF reports.
 
-- 🚗 **Garage & Vehicle Catalog:**
+- **Garage & Vehicle Catalog:**
     516 versions, 225 models and 34 brands from model year 2019, extracted from the official Inmetro PBE Veicular table with a source for every attribute.
 
-- 📚 **Trouble Code Catalog:**
+- **Trouble Code Catalog:**
     91 generic P0 codes with meaning and source; any other code is described by its system area following SAE J2012.
 
-- ⛽ **Car Journal:**
+- **Car Journal:**
     Fill-ups, services and symptoms, with tank-to-tank fuel economy compared to the official Inmetro figures for the selected version.
 
-- 🔔 **Maintenance Reminders:**
+- **Maintenance Reminders:**
     Daily notification when a service logged in the journal is within 7 days or 500 km of being due.
 
-- 🤖 **AI Analysis (demo):**
+- **AI Analysis (demo):**
     Hypotheses that cite the case evidence, through a small Node.js server that keeps the API key off the phone (Claude by default, Gemini for free testing).
 
-- 🧪 **Demo Mode:**
+- **Demo Mode:**
     Explore every screen without a car, with simulated data clearly marked.
 
-## 🛠️ Under the Hood (Main Technologies)
+## Under the Hood (Main Technologies)
 
 - **[Java 17](https://openjdk.org/) & [Android SDK](https://developer.android.com/):** Native app with views built in code, min SDK 26 and target SDK 35.
 - **[ELM327](https://www.elmelectronics.com/) over SPP, BLE and TCP:** Transport layer for the adapter, isolated behind `ElmTransport`.
@@ -94,7 +94,7 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 - **[Node.js](https://nodejs.org/):** AI proxy server with the [Anthropic](https://docs.anthropic.com/) and [Google Gen AI](https://ai.google.dev/) SDKs.
 - **[GitHub Actions](https://github.com/features/actions) & [Dependabot](https://docs.github.com/en/code-security/dependabot):** Build, tests, lint, signed releases and dependency updates.
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -113,7 +113,7 @@ flowchart LR
 
 The rules engine and the AI never touch the transport: they receive data, not commands. Clearing trouble codes lives in its own class and always asks for confirmation.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -166,7 +166,7 @@ Copy `keystore.properties.example` to `keystore.properties` (ignored by Git), fi
 
 Without that file the release APK is built unsigned.
 
-## 🧪 Quality & Tests
+## Quality & Tests
 
 The CI pipeline runs on every pull request and on every push to `main` and `develop`:
 
@@ -180,7 +180,7 @@ The CI pipeline runs on every pull request and on every push to `main` and `deve
 
 Pushing a `v*` tag runs the release workflow, which tests, builds and publishes the APK on the [Releases](https://github.com/YagoBorba/BorbaCarLabs/releases) page. It signs the APK when the `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` secrets are set.
 
-## 🧩 Project Structure
+## Project Structure
 
 ```text
 app/src/main/java/io/rea/obd/
@@ -203,7 +203,7 @@ tools/              catalog generation from the official sources
 docs/               demo script, privacy notice, screenshots and project history
 ```
 
-## ⚠️ Limitations
+## Limitations
 
 - Generic OBD-II emissions diagnostics only; ABS, airbag and manufacturer-specific modules are not read.
 - Code meanings only for codes in the catalog; other codes show their system area with no presumed cause.
@@ -211,7 +211,7 @@ docs/               demo script, privacy notice, screenshots and project history
 - The AI server is meant for local network demos (HTTP, daily counter kept in memory).
 - Not yet verified on a real car and adapter, or PDF rendering on a physical device.
 
-## 📚 Documentation
+## Documentation
 
 | Document | Content |
 |---|---|
@@ -224,7 +224,7 @@ docs/               demo script, privacy notice, screenshots and project history
 
 Project documents are written in Brazilian Portuguese.
 
-## 🤝 Contributing
+## Contributing
 
 This project follows **GitFlow** and **Conventional Commits**. Please read the [Contributing Guide](CONTRIBUTING.md) and the [Commit Convention](.github/COMMIT_CONVENTION.md).
 
@@ -233,11 +233,11 @@ This project follows **GitFlow** and **Conventional Commits**. Please read the [
 3. Push your branch.
 4. Open a Pull Request to `develop`.
 
-## 📝 License
+## License
 
 No `LICENSE` file is currently present in this repository. All rights reserved until a license is chosen.
 
-## 📬 Contact
+## Contact
 
 - Email: yagoaborba@hotmail.com
 - LinkedIn: https://www.linkedin.com/in/yagoborba/
