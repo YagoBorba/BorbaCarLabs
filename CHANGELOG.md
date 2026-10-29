@@ -7,6 +7,7 @@
 - Diário descreve os lembretes como funcionam hoje (antes dizia que não havia notificações); prontidão dos monitores e quadro congelado ganham explicação curta na confirmação da leitura guiada, no complemento e nas ferramentas do scanner.
 - Análise por IA remove telefones, e-mails, CPF, CNPJ e placas dos sintomas antes do envio; a prévia mostra o texto exato que sai do celular e o que foi removido. Textos e documentos deixam de prometer anonimização completa: nomes e endereços escritos livremente não são detectados.
 - Servidor de IA reserva a cota antes de chamar o provedor e grava o consumo do dia em arquivo: pedidos simultâneos não passam do limite e reiniciar o servidor não zera a contagem.
+- Servidor de IA com testes de comportamento (provedor falso, sem rede): contrato do pedido, token, cota, erro e demora do provedor, resposta inválida ou com evidência inventada; o CI roda `npm test`. Resposta da IA que não é JSON passa a voltar como 502, não como "JSON inválido" do pedido, e o provedor tem tempo-limite.
 
 ## 1.0.2 / Ferramentas — 28/10/2026
 
