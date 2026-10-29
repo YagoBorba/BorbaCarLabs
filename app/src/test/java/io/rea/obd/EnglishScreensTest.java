@@ -43,7 +43,7 @@ import org.robolectric.annotation.GraphicsMode;
 public class EnglishScreensTest {
     private static final File OUT = new File("build/screenshots/en");
     private static final Pattern PORTUGUESE = Pattern.compile(
-            "[ãõçáéíóúâêôÃÕÇÁÉÍÓÚÂÊÔ]|\\b(de|da|dos|das|não|com|para|em|uma|um|sem|seu|sua|você|leitura|veículo|registro|consulta|hoje|ontem)\\b",
+            "[ãõçáéíóúâêôÃÕÇÁÉÍÓÚÂÊÔ]|\\b(de|da|dos|das|não|com|para|em|uma|um|sem|seu|sua|você|leitura|leituras|veículo|registro|registros|consulta|hoje|ontem|consumo|gasolina|etanol|cidade|estrada|dias|sensores|ajustes|garagem|sintomas|tanque|cheio|abastecimentos|simulado|acompanhamento|ligados|desligados|salvar|voltar|continuar|cancelar|fechar|remover|apagar|enviar)\\b",
             Pattern.CASE_INSENSITIVE);
 
     private final Set<String> untranslated = new LinkedHashSet<>();
