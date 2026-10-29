@@ -22,14 +22,17 @@ prévia exibida. Nesse caso é enviado ao servidor configurado em Ajustes:
 
 - Tipo do veículo: marca, modelo, ano, versão, motor, combustível, transmissão e mercado.
 - Códigos de falha observados, estado da luz de injeção e leituras do caso.
-- Os sintomas que você escreveu na investigação (até 500 caracteres por campo).
+- Os sintomas que você escreveu na investigação (até 500 caracteres por campo). Antes do envio, o app
+  remove telefones, e-mails, CPF, CNPJ e placas encontrados nesse texto. Nomes, endereços e outros dados
+  pessoais escritos livremente **não** são detectados; a prévia mostra o texto exato que será enviado.
 
 **Não são enviados:** nome do perfil, VIN, anotações, nome ou endereço do adaptador,
 identificadores internos e horários. A resposta da IA não é salva no caso.
 
 O servidor intermediário repassa o caso a um provedor de IA (Anthropic/Claude ou Google/Gemini,
 conforme configurado por quem opera o servidor). No **nível gratuito do Gemini**, o Google pode usar o
-conteúdo recebido para melhorar seus produtos; por isso o caso já sai anonimizado do celular.
+conteúdo recebido para melhorar seus produtos; por isso o app envia só os campos acima, sem identificadores,
+mas não garante anonimização completa do texto livre dos sintomas.
 
 ## Exportações
 

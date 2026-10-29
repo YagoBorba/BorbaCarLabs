@@ -107,7 +107,7 @@ flowchart LR
     K[DtcCatalog with sources + DtcStructure SAE J2012] --> DC
     DC --> H[DiagnosticCaseStore / HistoryStore SQLite]
     DC --> R[JSON, TXT and PDF reports]
-    DC --> AR[Anonymized AnalysisRequest] -.HTTP.-> S[server/: Claude or Gemini]
+    DC --> AR[Minimized AnalysisRequest] -.HTTP.-> S[server/: Claude or Gemini]
     S -.-> AV[Validated AnalysisResult]
 ```
 
@@ -174,7 +174,7 @@ The CI pipeline runs on every pull request and on every push to `main` and `deve
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
 
-- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (anonymization and rejection of invented evidence).
+- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (data minimization, personal data filter and rejection of invented evidence).
 - **Screen tests:** Robolectric opens the real `MainActivity`, walks through every main screen and a scenario with a vehicle profile, journal and a demo reading, saving the screenshots above.
 - **Lint:** no errors; the report, test results, screenshots and APK are uploaded as workflow artifacts.
 

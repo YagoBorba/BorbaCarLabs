@@ -5,9 +5,10 @@ Anthropic fica só aqui; o celular conhece apenas o endereço deste servidor e u
 
 ## O que ele faz
 
-1. Recebe do app um caso **já anonimizado** (tipo do veículo, códigos, luz de injeção, leituras e
+1. Recebe do app um caso **com dados mínimos** (tipo do veículo, códigos, luz de injeção, leituras e
    sintomas declarados, cada item com uma referência `D1`, `M1`, `T1`…). Nome do perfil, VIN,
-   notas, adaptador, identificadores e horários não saem do celular.
+   notas, adaptador, identificadores e horários não saem do celular; telefones, e-mails, CPF, CNPJ e
+   placas são removidos dos sintomas, mas nomes e endereços escritos ali não são detectados.
 2. Pede ao Claude hipóteses em formato JSON fixo (structured outputs), com esforço `low` para
    respostas curtas e baratas.
 3. Recusa respostas fora do contrato ou que citem referências que não foram enviadas. O app
@@ -41,8 +42,8 @@ em **Análise por IA (demonstração)**; o app mostra o que será enviado e pede
 ## Testar de graça com o Gemini (Google)
 
 A API do Gemini tem um nível gratuito, sem cartão, bom para poucos testes. No nível gratuito o
-Google usa o conteúdo enviado para melhorar seus produtos; o caso já sai anonimizado do celular,
-mas não envie dados que você não queira compartilhar. Os limites por modelo aparecem no AI Studio.
+Google usa o conteúdo enviado para melhorar seus produtos; o app envia só dados mínimos,
+mas o texto livre dos sintomas pode conter dados pessoais que o filtro não reconhece; não envie o que você não queira compartilhar. Os limites por modelo aparecem no AI Studio.
 
 1. Entre em **aistudio.google.com** com uma conta Google e clique em **Get API key** › **Create API key**.
 2. Salve a chave nas variáveis do seu usuário (PowerShell):
