@@ -1,5 +1,9 @@
 # Histórico de alterações
 
+## Em desenvolvimento
+
+- App em português e inglês: novo item Idioma em Ajustes (Automático, Português ou English). Telas, diálogos, notificações de lembrete, relatórios TXT/PDF e catálogo de códigos traduzidos; números seguem o idioma (12,4 ou 12.4). A análise por IA responde no idioma escolhido. Casos salvos não mudam: a tradução acontece só na exibição.
+
 ## 1.1.0 / Confiabilidade — 29/10/2026
 
 - Lembretes de manutenção controlados por serviço: um serviço novo não esconde mais o lembrete de outro (troca de óleo + rodízio de pneus), registrar o mesmo serviço sem novo prazo conclui o lembrete e a tela Hoje mostra o próximo a vencer, não o último cadastrado.
