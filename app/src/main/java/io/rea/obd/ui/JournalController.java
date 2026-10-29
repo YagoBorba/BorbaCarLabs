@@ -243,7 +243,7 @@ public final class JournalController {
         LinearLayout disclosure = uiKit.disclosure(linearLayout, "Opções do diário");
         uiKit.button(disclosure, "Exportar diário deste veículo", false, () -> this.exportVehicle(vehicle)).setEnabled((vehicle == null || !this.entries.stream().anyMatch((obj) -> ((JournalEntry) obj).vehicleId.equals(vehicle.id)) || this.saving) ? false : true);
         uiKit.button(disclosure, "Diários de perfis removidos", false, () -> this.detached()).setEnabled(this.entries.stream().anyMatch((obj) -> this.isDetached((JournalEntry) obj)));
-        uiKit.label(disclosure, "Prazos de serviço são anotações. Notificações automáticas e restauração de backup ainda não fazem parte deste diário.", 12, UiKit.MUTED, false);
+        uiKit.label(disclosure, "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Restaurar backup ainda não faz parte deste diário.", 12, UiKit.MUTED, false);
     }
 
     boolean isDetached(JournalEntry journalEntry) {

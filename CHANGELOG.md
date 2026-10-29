@@ -4,6 +4,7 @@
 
 - Lembretes de manutenção controlados por serviço: um serviço novo não esconde mais o lembrete de outro (troca de óleo + rodízio de pneus), registrar o mesmo serviço sem novo prazo conclui o lembrete e a tela Hoje mostra o próximo a vencer, não o último cadastrado.
 - Release só é publicada com certificado: sem os segredos de assinatura o workflow falha antes de criar a versão, e a assinatura é conferida com `apksigner` antes da publicação. Execução manual gera só o APK como artefato.
+- Diário descreve os lembretes como funcionam hoje (antes dizia que não havia notificações); prontidão dos monitores e quadro congelado ganham explicação curta na confirmação da leitura guiada, no complemento e nas ferramentas do scanner.
 
 ## 1.0.2 / Ferramentas — 28/10/2026
 
