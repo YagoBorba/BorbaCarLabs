@@ -15,7 +15,10 @@ Anthropic fica só aqui; o celular conhece apenas o endereço deste servidor e u
    confere tudo de novo antes de exibir.
 
 Limites: token obrigatório, caso de até 16 KB, `BORBACAR_DAILY_LIMIT` análises por dia (padrão 20).
-Pedidos recusados antes da chamada não contam no limite.
+Cada análise reserva uma unidade **antes** de chamar o provedor, então pedidos simultâneos não
+ultrapassam o limite. Pedidos recusados antes da chamada, ou que falham sem resposta do provedor,
+devolvem a unidade. O consumo do dia fica em `server/usage.json` (ou em `BORBACAR_USAGE_FILE`),
+sobrevive a reinícios e zera à meia-noite no horário do servidor.
 
 ## Como rodar (Node 20+)
 

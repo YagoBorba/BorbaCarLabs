@@ -11,3 +11,4 @@ keystore.properties
 *.iml
 .DS_Store
 *.apk
+server/usage.json
