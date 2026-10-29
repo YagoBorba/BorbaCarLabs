@@ -19,6 +19,9 @@ Cada análise reserva uma unidade **antes** de chamar o provedor, então pedidos
 ultrapassam o limite. Pedidos recusados antes da chamada, ou que falham sem resposta do provedor,
 devolvem a unidade. O consumo do dia fica em `server/usage.json` (ou em `BORBACAR_USAGE_FILE`),
 sobrevive a reinícios e zera à meia-noite no horário do servidor.
+Se o provedor não responder em `BORBACAR_TIMEOUT_MS` (padrão 60000), o app recebe 504.
+
+Testes: `npm test` sobe o servidor com um provedor falso, sem rede e sem chaves.
 
 ## Como rodar (Node 20+)
 
