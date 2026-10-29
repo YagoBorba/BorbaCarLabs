@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,6 +13,8 @@ jobs:
     name: APK de release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@v7
 
@@ -29,8 +32,16 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "Sem certificado configurado: o APK sai sem assinatura."
+          missing=""
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            if [ "$PUBLISH" = "true" ]; then
+              echo "::error::Segredos de assinatura ausentes:$missing. A release não é publicada sem assinatura."
+              exit 1
+            fi
+            echo "::warning::Sem certificado: o APK desta execução manual sai sem assinatura e não é publicado."
             exit 0
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
@@ -44,7 +55,15 @@ jobs:
       - name: Testar e gerar o APK
         run: ./gradlew testDebugUnitTest assembleRelease --stacktrace
 
+      - name: Conferir assinatura
+        if: env.PUBLISH == 'true' || hashFiles('keystore.properties') != ''
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner"
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          "$apksigner" verify --verbose --print-certs "$apk"
+
       - name: Publicar
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -53,6 +72,13 @@ jobs:
           cp "$apk" "$name"
           notes=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## "v" " {p=1; next} /^## / {p=0} p' CHANGELOG.md)
           gh release create "$GITHUB_REF_NAME" "$name" --title "BorbaCar Labs ${GITHUB_REF_NAME#v}" --notes "${notes:-Versão ${GITHUB_REF_NAME#v}}"
+
+      - name: APK da execução manual
+        if: env.PUBLISH != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk-release
+          path: app/build/outputs/apk/release/*.apk
 
       - name: Limpar certificado
         if: always()
