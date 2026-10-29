@@ -76,6 +76,25 @@ public class ScreensTest {
     }
 
     @Test
+    public void deniedBluetoothPermissionExplainsInsteadOfListingDevices() {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        String[] permissions = {"android.permission.BLUETOOTH_CONNECT", "android.permission.BLUETOOTH_SCAN"};
+        int[] denied = {android.content.pm.PackageManager.PERMISSION_DENIED, android.content.pm.PackageManager.PERMISSION_DENIED};
+        activity.onRequestPermissionsResult(100, permissions, denied);
+        idle();
+        android.app.AlertDialog dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        assertNotNull(dialog);
+        assertTrue(dialog.isShowing());
+        assertTrue(shadowOf(dialog).getMessage().toString().contains("Permissão necessária para acessar o adaptador."));
+        int[] dismissed = {};
+        activity.onRequestPermissionsResult(101, permissions, dismissed);
+        idle();
+        assertTrue(org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog() == dialog);
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void everyMainScreenRenders() throws IOException {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();

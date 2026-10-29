@@ -87,6 +87,35 @@ public class ObdReaderTest {
     }
 
     @Test
+    public void codeReadCutMidwayIsIncompleteAndStopsQuerying() throws IOException {
+        FakeAdapter adapter = FakeAdapter.canCar()
+                .reply("0101", "410100076500")
+                .reply("03", FakeAdapter.DISCONNECT);
+        DtcReadResult result = reader(adapter).readCodes("vehicle-1", "session-1");
+
+        assertTrue(result.incomplete());
+        assertEquals(DtcReadResult.Outcome.DISCONNECTED, result.services.get(0).status.outcome);
+        assertEquals(DtcReadResult.Outcome.NOT_READ, result.services.get(1).status.outcome);
+        assertEquals(DtcReadResult.Outcome.NOT_READ, result.services.get(2).status.outcome);
+        assertTrue(!adapter.sent.contains("07"));
+        assertTrue(!adapter.sent.contains("0A"));
+        assertEquals("Leitura incompleta", io.rea.obd.ui.DiagnosisScreen.headline(result).title);
+        assertTrue(!io.rea.obd.ui.DiagnosisScreen.headline(result).clean);
+    }
+
+    @Test
+    public void connectionLostBeforeTheMilSkipsEveryCodeQuery() throws IOException {
+        FakeAdapter adapter = FakeAdapter.canCar().reply("0101", FakeAdapter.DISCONNECT);
+        DtcReadResult result = reader(adapter).readCodes("vehicle-1", "session-1");
+
+        assertTrue(result.incomplete());
+        for (DtcReadResult.ServiceResult service : result.services) {
+            assertEquals(DtcReadResult.Outcome.NOT_READ, service.status.outcome);
+        }
+        assertTrue(!adapter.sent.contains("03"));
+    }
+
+    @Test
     public void supplementStopsQueryingAfterTransportLoss() throws IOException {
         FakeAdapter adapter = FakeAdapter.canCar().reply("0101", FakeAdapter.DISCONNECT);
         SupplementalReadResult result = reader(adapter).readSupplement("vehicle-1", "session-1");
