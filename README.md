@@ -178,7 +178,16 @@ The CI pipeline runs on every pull request and on every push to `main` and `deve
 - **Screen tests:** Robolectric opens the real `MainActivity`, walks through every main screen and a scenario with a vehicle profile, journal and a demo reading, saving the screenshots above.
 - **Lint:** no errors; the report, test results, screenshots and APK are uploaded as workflow artifacts.
 
-Pushing a `v*` tag runs the release workflow, which tests, builds and publishes the APK on the [Releases](https://github.com/YagoBorba/BorbaCarLabs/releases) page. It signs the APK when the `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` secrets are set.
+Pushing a `v*` tag runs the release workflow, which tests, builds, signs and publishes the APK on the [Releases](https://github.com/YagoBorba/BorbaCarLabs/releases) page. Publishing requires these repository secrets; without any of them the workflow fails before creating the release:
+
+| Secret | Content |
+|---|---|
+| `KEYSTORE_BASE64` | The keystore file encoded in Base64 |
+| `KEYSTORE_PASSWORD` | Keystore password |
+| `KEY_ALIAS` | Alias of the signing key |
+| `KEY_PASSWORD` | Password of the signing key |
+
+The signature is checked with `apksigner verify` before publishing. Running the workflow manually (`workflow_dispatch`) only builds the APK as a workflow artifact, unsigned when the secrets are missing, and never creates a release.
 
 ## Project Structure
 
