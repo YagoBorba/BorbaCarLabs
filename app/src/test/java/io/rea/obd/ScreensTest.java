@@ -23,7 +23,7 @@ import org.robolectric.annotation.GraphicsMode;
 
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = 35, qualifiers = "w393dp-h852dp-xhdpi")
+@Config(sdk = 35, qualifiers = "pt-rBR-w393dp-h852dp-xhdpi")
 public class ScreensTest {
     private static final File OUT = new File("build/screenshots");
 
