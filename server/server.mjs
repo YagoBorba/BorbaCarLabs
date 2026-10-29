@@ -1,13 +1,16 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
+import { DailyQuota } from "./quota.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const TOKEN = process.env.BORBACAR_TOKEN ?? "";
 const PROVIDER = (process.env.BORBACAR_PROVIDER ?? "claude").toLowerCase();
 const MODEL = process.env.BORBACAR_MODEL ?? (PROVIDER === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-5-5");
 const DAILY_LIMIT = Number(process.env.BORBACAR_DAILY_LIMIT ?? 20);
+const USAGE_FILE = process.env.BORBACAR_USAGE_FILE ?? fileURLToPath(new URL("./usage.json", import.meta.url));
 const MAX_BODY = 16 * 1024;
 const REQUEST_SCHEMA = "borbacar-ai-request-1";
 
@@ -69,8 +72,7 @@ const ANALYSIS_SCHEMA = {
 
 const SUPPORTS_FALLBACK = /^claude-(opus-5|fable-5|sonnet-5-5)/.test(MODEL);
 
-let usageDay = new Date().toISOString().slice(0, 10);
-let usedToday = 0;
+const quota = new DailyQuota({ limit: DAILY_LIMIT, file: USAGE_FILE });
 
 function send(res, status, body) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -130,8 +132,8 @@ function checkAnalysis(analysis, refs) {
   }
 }
 
-async function analyze(kase, refs) {
-  return PROVIDER === "gemini" ? analyzeWithGemini(kase, refs) : analyzeWithClaude(kase, refs);
+async function analyze(kase, refs, attempt) {
+  return PROVIDER === "gemini" ? analyzeWithGemini(kase, refs, attempt) : analyzeWithClaude(kase, refs, attempt);
 }
 
 function withoutClosedObjects(schema) {
@@ -146,7 +148,7 @@ function withoutClosedObjects(schema) {
   return schema;
 }
 
-async function analyzeWithGemini(kase, refs) {
+async function analyzeWithGemini(kase, refs, attempt) {
   if (!gemini) {
     throw Object.assign(new Error("Servidor de IA sem chave do Gemini configurada"), { status: 500 });
   }
@@ -163,14 +165,14 @@ async function analyzeWithGemini(kase, refs) {
     const status = error?.status === 429 ? 503 : 502;
     throw Object.assign(new Error(status === 503 ? "Limite gratuito do Gemini atingido; tente mais tarde" : "Falha na API do Gemini"), { status });
   }
-  usedToday++;
+  attempt.answered = true;
   const analysis = JSON.parse(interaction.output_text ?? "");
   checkAnalysis(analysis, refs);
   console.log(`análise ok · ${MODEL} (Gemini)`);
   return { model: MODEL, analysis };
 }
 
-async function analyzeWithClaude(kase, refs) {
+async function analyzeWithClaude(kase, refs, attempt) {
   const params = {
     model: MODEL,
     max_tokens: 4000,
@@ -181,7 +183,7 @@ async function analyzeWithClaude(kase, refs) {
   const response = SUPPORTS_FALLBACK
     ? await client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" })
     : await client.messages.create(params);
-  usedToday++;
+  attempt.answered = true;
 
   if (response.stop_reason === "refusal") {
     throw Object.assign(new Error("A IA não aceitou analisar este caso"), { status: 422 });
@@ -197,9 +199,10 @@ async function analyzeWithClaude(kase, refs) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const attempt = { reserved: false, answered: false };
   try {
     if (req.method === "GET" && req.url === "/health") {
-      return send(res, 200, { ok: true, provider: PROVIDER, model: MODEL, remaining_today: Math.max(0, DAILY_LIMIT - usedToday) });
+      return send(res, 200, { ok: true, provider: PROVIDER, model: MODEL, remaining_today: quota.remaining() });
     }
     if (req.method !== "POST" || req.url !== "/v1/analyze") {
       return send(res, 404, { error: "Rota inexistente" });
@@ -207,17 +210,16 @@ const server = http.createServer(async (req, res) => {
     if (!authorized(req)) {
       return send(res, 401, { error: "Token inválido" });
     }
-    const today = new Date().toISOString().slice(0, 10);
-    if (today !== usageDay) {
-      usageDay = today;
-      usedToday = 0;
-    }
-    if (usedToday >= DAILY_LIMIT) {
+    const { kase, refs } = acceptCase(await readJson(req));
+    if (!quota.reserve()) {
       return send(res, 429, { error: "Limite diário de demonstração atingido" });
     }
-    const { kase, refs } = acceptCase(await readJson(req));
-    return send(res, 200, await analyze(kase, refs));
+    attempt.reserved = true;
+    return send(res, 200, await analyze(kase, refs, attempt));
   } catch (error) {
+    if (attempt.reserved && !attempt.answered) {
+      quota.release();
+    }
     if (error instanceof Anthropic.RateLimitError) {
       return send(res, 503, { error: "API da Anthropic ocupada; tente em instantes" });
     }

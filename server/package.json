@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Servidor intermediário de análise por IA do BorbaCar Labs (guarda a chave da Anthropic).",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
