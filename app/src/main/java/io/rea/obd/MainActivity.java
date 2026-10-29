@@ -1153,7 +1153,8 @@ public final class MainActivity extends Activity {
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
                         + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas. "
-                        + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados.\n\n"
+                        + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados. "
+                        + "Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços digitados ali não são detectados.\n\n"
                         + "Relatórios só saem quando você escolhe onde salvar ou compartilhar. Para apagar tudo: Configurações do Android › Apps › BorbaCar Labs › Limpar dados."));
         button(this.body, Motion.reduced(this) ? "Animações: reduzidas" : "Animações: suaves", false, () -> {
             if (Motion.saveReduced(this, !Motion.reduced(this))) {
@@ -2670,9 +2671,23 @@ public final class MainActivity extends Activity {
         for (String label : request.labels.values()) {
             preview.append("• ").append(label).append("\n");
         }
-        preview.append("• Sintomas declarados nesta investigação\n\n")
-                .append("Não são enviados: nome do perfil, VIN, notas, adaptador, identificadores ou horários. ")
-                .append("A resposta é gerada por IA (Claude) e não substitui a avaliação de um profissional.");
+        JSONObject symptoms = request.body.optJSONObject("symptoms");
+        if (symptoms != null) {
+            String[][] fields = {{"description", "Sintoma"}, {"when", "Quando"}, {"frequency", "Frequência"}, {"conditions", "Condições"}};
+            for (String[] field : fields) {
+                String text = symptoms.optString(field[0], "");
+                if (!text.isEmpty()) {
+                    preview.append("• ").append(field[1]).append(": \"").append(text).append("\"\n");
+                }
+            }
+        }
+        preview.append("\n");
+        if (!request.removed.isEmpty()) {
+            preview.append("Removido do texto antes do envio: ").append(request.removed).append(".\n");
+        }
+        preview.append("Não são enviados: nome do perfil, VIN, notas, adaptador, identificadores ou horários. ")
+                .append("Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços não são detectados, então confira o texto acima. ")
+                .append("A resposta é gerada por IA e não substitui a avaliação de um profissional.");
         new AlertDialog.Builder(this).setTitle("Enviar para análise por IA?").setMessage(preview.toString())
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Enviar", (dialog, which) -> {

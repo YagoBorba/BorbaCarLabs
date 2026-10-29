@@ -24,10 +24,12 @@ public final class AnalysisRequest {
 
     public final JSONObject body;
     public final Map<String, String> labels;
+    public final String removed;
 
-    private AnalysisRequest(JSONObject body, Map<String, String> labels) {
+    private AnalysisRequest(JSONObject body, Map<String, String> labels, String removed) {
         this.body = body;
         this.labels = Collections.unmodifiableMap(labels);
+        this.removed = removed;
     }
 
     public Set<String> refs() {
@@ -36,6 +38,7 @@ public final class AnalysisRequest {
 
     public static AnalysisRequest from(DiagnosticCase diagnosticCase) throws JSONException {
         Map<String, String> labels = new LinkedHashMap<>();
+        PersonalDataFilter filter = new PersonalDataFilter();
         JSONArray observations = new JSONArray();
 
         Set<String> seen = new LinkedHashSet<>();
@@ -96,32 +99,32 @@ public final class AnalysisRequest {
 
         JSONObject body = new JSONObject()
                 .put("schema", SCHEMA)
-                .put("vehicle", vehicle(diagnosticCase.vehicle))
+                .put("vehicle", vehicle(diagnosticCase.vehicle, filter))
                 .put("read_complete", !diagnosticCase.dtc.incomplete())
                 .put("demonstration_data", diagnosticCase.dtc.origin == io.rea.obd.model.DataOrigin.SIMULATED)
                 .put("observations", observations);
         if (diagnosticCase.symptoms != null) {
             body.put("symptoms", new JSONObject()
-                    .put("description", clip(diagnosticCase.symptoms.description))
-                    .put("when", clip(diagnosticCase.symptoms.when))
-                    .put("frequency", clip(diagnosticCase.symptoms.frequency))
-                    .put("conditions", clip(diagnosticCase.symptoms.conditions)));
+                    .put("description", clip(filter.apply(diagnosticCase.symptoms.description)))
+                    .put("when", clip(filter.apply(diagnosticCase.symptoms.when)))
+                    .put("frequency", clip(filter.apply(diagnosticCase.symptoms.frequency)))
+                    .put("conditions", clip(filter.apply(diagnosticCase.symptoms.conditions))));
         }
-        return new AnalysisRequest(body, labels);
+        return new AnalysisRequest(body, labels, filter.summary());
     }
 
-    private static JSONObject vehicle(VehicleProfile profile) throws JSONException {
+    private static JSONObject vehicle(VehicleProfile profile, PersonalDataFilter filter) throws JSONException {
         JSONObject vehicle = new JSONObject();
         if (profile == null) {
             return vehicle;
         }
-        putText(vehicle, "make", profile.make);
-        putText(vehicle, "model", profile.model);
-        putText(vehicle, "trim", profile.trim);
-        putText(vehicle, "engine", profile.engine);
-        putText(vehicle, "fuel", profile.fuel);
-        putText(vehicle, "transmission", profile.transmission);
-        putText(vehicle, "market", profile.market);
+        putText(vehicle, "make", filter.apply(profile.make));
+        putText(vehicle, "model", filter.apply(profile.model));
+        putText(vehicle, "trim", filter.apply(profile.trim));
+        putText(vehicle, "engine", filter.apply(profile.engine));
+        putText(vehicle, "fuel", filter.apply(profile.fuel));
+        putText(vehicle, "transmission", filter.apply(profile.transmission));
+        putText(vehicle, "market", filter.apply(profile.market));
         if (profile.year != null) {
             vehicle.put("year", profile.year);
         }
