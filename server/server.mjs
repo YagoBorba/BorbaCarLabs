@@ -1,8 +1,7 @@
-import http from "node:http";
-import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
+import { createApp, failure } from "./app.mjs";
 import { DailyQuota } from "./quota.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -11,8 +10,7 @@ const PROVIDER = (process.env.BORBACAR_PROVIDER ?? "claude").toLowerCase();
 const MODEL = process.env.BORBACAR_MODEL ?? (PROVIDER === "gemini" ? "gemini-3.5-flash-lite" : "claude-opus-5-5");
 const DAILY_LIMIT = Number(process.env.BORBACAR_DAILY_LIMIT ?? 20);
 const USAGE_FILE = process.env.BORBACAR_USAGE_FILE ?? fileURLToPath(new URL("./usage.json", import.meta.url));
-const MAX_BODY = 16 * 1024;
-const REQUEST_SCHEMA = "borbacar-ai-request-1";
+const TIMEOUT_MS = Number(process.env.BORBACAR_TIMEOUT_MS ?? 60_000);
 
 if (TOKEN.length < 16) {
   console.error("Defina BORBACAR_TOKEN com pelo menos 16 caracteres (veja server/README.md).");
@@ -72,70 +70,6 @@ const ANALYSIS_SCHEMA = {
 
 const SUPPORTS_FALLBACK = /^claude-(opus-5|fable-5|sonnet-5-5)/.test(MODEL);
 
-const quota = new DailyQuota({ limit: DAILY_LIMIT, file: USAGE_FILE });
-
-function send(res, status, body) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify(body));
-}
-
-function authorized(req) {
-  const given = Buffer.from((req.headers.authorization ?? "").replace(/^Bearer /, ""));
-  const expected = Buffer.from(TOKEN);
-  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
-}
-
-async function readJson(req) {
-  let size = 0;
-  const chunks = [];
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > MAX_BODY) {
-      throw Object.assign(new Error("Caso grande demais"), { status: 413 });
-    }
-    chunks.push(chunk);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
-
-function acceptCase(body) {
-  if (body?.schema !== REQUEST_SCHEMA || !Array.isArray(body.observations) || body.observations.length > 60) {
-    throw Object.assign(new Error("Caso fora do contrato"), { status: 400 });
-  }
-  const refs = new Set(body.observations.map((item) => item?.ref).filter((ref) => typeof ref === "string"));
-  const kase = {
-    vehicle: body.vehicle ?? {},
-    read_complete: body.read_complete === true,
-    demonstration_data: body.demonstration_data === true,
-    observations: body.observations,
-    symptoms: body.symptoms ?? {},
-  };
-  return { kase, refs };
-}
-
-function checkAnalysis(analysis, refs) {
-  const short = (value, max) => typeof value === "string" && value.length <= max;
-  const ok =
-    short(analysis.summary, 1200) && analysis.summary.trim() !== "" &&
-    Array.isArray(analysis.hypotheses) && analysis.hypotheses.length <= 5 &&
-    analysis.hypotheses.every(
-      (h) =>
-        short(h.title, 160) && short(h.reasoning, 1200) && short(h.next_check, 600) &&
-        ["baixa", "media", "alta"].includes(h.confidence) &&
-        Array.isArray(h.evidence) && h.evidence.length > 0 && h.evidence.every((ref) => refs.has(ref)),
-    ) &&
-    Array.isArray(analysis.missing_information) && analysis.missing_information.length <= 8 &&
-    analysis.missing_information.every((item) => short(item, 300)) &&
-    short(analysis.safety_note, 600);
-  if (!ok) {
-    throw Object.assign(new Error("Resposta da IA fora do contrato"), { status: 502 });
-  }
-}
-
-async function analyze(kase, refs, attempt) {
-  return PROVIDER === "gemini" ? analyzeWithGemini(kase, refs, attempt) : analyzeWithClaude(kase, refs, attempt);
-}
-
 function withoutClosedObjects(schema) {
   if (Array.isArray(schema)) {
     return schema.map(withoutClosedObjects);
@@ -148,9 +82,9 @@ function withoutClosedObjects(schema) {
   return schema;
 }
 
-async function analyzeWithGemini(kase, refs, attempt) {
+async function analyzeWithGemini(kase, attempt) {
   if (!gemini) {
-    throw Object.assign(new Error("Servidor de IA sem chave do Gemini configurada"), { status: 500 });
+    throw failure(500, "Servidor de IA sem chave do Gemini configurada");
   }
   let interaction;
   try {
@@ -163,16 +97,36 @@ async function analyzeWithGemini(kase, refs, attempt) {
   } catch (error) {
     console.error("Erro do Gemini:", error?.status ?? "", error?.message ?? error);
     const status = error?.status === 429 ? 503 : 502;
-    throw Object.assign(new Error(status === 503 ? "Limite gratuito do Gemini atingido; tente mais tarde" : "Falha na API do Gemini"), { status });
+    throw failure(status, status === 503 ? "Limite gratuito do Gemini atingido; tente mais tarde" : "Falha na API do Gemini");
   }
   attempt.answered = true;
-  const analysis = JSON.parse(interaction.output_text ?? "");
-  checkAnalysis(analysis, refs);
-  console.log(`análise ok · ${MODEL} (Gemini)`);
-  return { model: MODEL, analysis };
+  console.log(`resposta recebida · ${MODEL} (Gemini)`);
+  return { model: MODEL, text: interaction.output_text ?? "" };
 }
 
-async function analyzeWithClaude(kase, refs, attempt) {
+function claudeFailure(error) {
+  if (error instanceof Anthropic.RateLimitError) {
+    return failure(503, "API da Anthropic ocupada; tente em instantes");
+  }
+  if (error instanceof Anthropic.AuthenticationError) {
+    console.error("Chave da Anthropic inválida ou ausente no servidor.");
+    return failure(500, "Servidor de IA sem credencial válida");
+  }
+  if (error instanceof Anthropic.APIConnectionError) {
+    return failure(502, "Sem conexão com a API da Anthropic");
+  }
+  if (error instanceof Anthropic.APIError) {
+    console.error("Erro da API:", error.status, error.message);
+    return failure(502, "Falha na API da Anthropic");
+  }
+  if (/Could not resolve authentication/i.test(error?.message ?? "")) {
+    console.error("Sem credencial da Anthropic: defina ANTHROPIC_API_KEY ou faça `ant auth login`.");
+    return failure(500, "Servidor de IA sem chave da Anthropic configurada");
+  }
+  return error;
+}
+
+async function analyzeWithClaude(kase, attempt) {
   const params = {
     model: MODEL,
     max_tokens: 4000,
@@ -180,73 +134,32 @@ async function analyzeWithClaude(kase, refs, attempt) {
     system: SYSTEM,
     messages: [{ role: "user", content: JSON.stringify(kase) }],
   };
-  const response = SUPPORTS_FALLBACK
-    ? await client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" })
-    : await client.messages.create(params);
+  let response;
+  try {
+    response = SUPPORTS_FALLBACK
+      ? await client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" })
+      : await client.messages.create(params);
+  } catch (error) {
+    throw claudeFailure(error);
+  }
   attempt.answered = true;
-
   if (response.stop_reason === "refusal") {
-    throw Object.assign(new Error("A IA não aceitou analisar este caso"), { status: 422 });
+    throw failure(422, "A IA não aceitou analisar este caso");
   }
   if (response.stop_reason === "max_tokens") {
-    throw Object.assign(new Error("Resposta da IA incompleta"), { status: 502 });
+    throw failure(502, "Resposta da IA incompleta");
   }
-  const text = response.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-  const analysis = JSON.parse(text);
-  checkAnalysis(analysis, refs);
-  console.log(`análise ok · ${response.model} · entrada ${response.usage.input_tokens} · saída ${response.usage.output_tokens} tokens`);
-  return { model: response.model, analysis };
+  console.log(`resposta recebida · ${response.model} · entrada ${response.usage.input_tokens} · saída ${response.usage.output_tokens} tokens`);
+  return { model: response.model, text: response.content.filter((block) => block.type === "text").map((block) => block.text).join("") };
 }
 
-const server = http.createServer(async (req, res) => {
-  const attempt = { reserved: false, answered: false };
-  try {
-    if (req.method === "GET" && req.url === "/health") {
-      return send(res, 200, { ok: true, provider: PROVIDER, model: MODEL, remaining_today: quota.remaining() });
-    }
-    if (req.method !== "POST" || req.url !== "/v1/analyze") {
-      return send(res, 404, { error: "Rota inexistente" });
-    }
-    if (!authorized(req)) {
-      return send(res, 401, { error: "Token inválido" });
-    }
-    const { kase, refs } = acceptCase(await readJson(req));
-    if (!quota.reserve()) {
-      return send(res, 429, { error: "Limite diário de demonstração atingido" });
-    }
-    attempt.reserved = true;
-    return send(res, 200, await analyze(kase, refs, attempt));
-  } catch (error) {
-    if (attempt.reserved && !attempt.answered) {
-      quota.release();
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return send(res, 503, { error: "API da Anthropic ocupada; tente em instantes" });
-    }
-    if (error instanceof Anthropic.AuthenticationError) {
-      console.error("Chave da Anthropic inválida ou ausente no servidor.");
-      return send(res, 500, { error: "Servidor de IA sem credencial válida" });
-    }
-    if (error instanceof Anthropic.APIConnectionError) {
-      return send(res, 502, { error: "Sem conexão com a API da Anthropic" });
-    }
-    if (error instanceof Anthropic.APIError) {
-      console.error("Erro da API:", error.status, error.message);
-      return send(res, 502, { error: "Falha na API da Anthropic" });
-    }
-    if (/Could not resolve authentication/i.test(error?.message ?? "")) {
-      console.error("Sem credencial da Anthropic: defina ANTHROPIC_API_KEY ou faça `ant auth login`.");
-      return send(res, 500, { error: "Servidor de IA sem chave da Anthropic configurada" });
-    }
-    if (error instanceof SyntaxError) {
-      return send(res, 400, { error: "JSON inválido" });
-    }
-    if (error.status) {
-      return send(res, error.status, { error: error.message });
-    }
-    console.error(error);
-    return send(res, 500, { error: "Erro interno" });
-  }
+const server = createApp({
+  token: TOKEN,
+  provider: PROVIDER,
+  model: MODEL,
+  quota: new DailyQuota({ limit: DAILY_LIMIT, file: USAGE_FILE }),
+  analyze: PROVIDER === "gemini" ? analyzeWithGemini : analyzeWithClaude,
+  timeoutMs: TIMEOUT_MS,
 });
 
 server.listen(PORT, "0.0.0.0", () => {
