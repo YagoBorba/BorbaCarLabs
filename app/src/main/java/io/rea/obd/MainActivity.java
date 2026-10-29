@@ -847,7 +847,7 @@ public final class MainActivity extends Activity {
         if (this.demo || connected()) {
             button(feature, "Iniciar leitura guiada", true, () -> this.confirmGuidedRead()).setEnabled((this.busy || this.caseBusy) ? false : true);
             button(feature, this.busy ? "Leitura em andamento…" : "Ler só os códigos de falha", false, () -> this.scan()).setEnabled(!this.busy);
-            label(feature, "A leitura guiada também coleta prontidão dos monitores e quadro congelado.", 12, this.MUTED, false);
+            label(feature, "A leitura guiada também coleta a prontidão dos monitores e o quadro congelado.", 12, this.MUTED, false);
         }
         if (!this.guidedStatus.isEmpty()) {
             DiagnosisScreen.progress(feature, this.guidedCompleted, this.guidedStatus);
@@ -884,6 +884,7 @@ public final class MainActivity extends Activity {
             LinearLayout card = card(this.body);
             label(card, this.currentSupplement.incomplete() ? "COMPLEMENTO INCOMPLETO" : "COMPLEMENTO COLETADO", 11, this.AMBER, true);
             label(card, "Prontidão e quadro 00 têm estados e horários próprios. Salve uma investigação para preservar este complemento.", 13, this.MUTED, false);
+            label(card, DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT, 12, this.MUTED, false);
             button(card, "Ver prontidão e quadro coletados", false, () -> message(String.join("\n", SupplementalFormatter.lines(this.currentSupplement))));
         }
         uiKit.row(this.body, "Ao vivo", () -> navigate(0));
@@ -899,8 +900,10 @@ public final class MainActivity extends Activity {
         LinearLayout disclosure2 = uiKit.disclosure(this.body, "Ferramentas do scanner");
         label(disclosure2, "ABS, airbags e módulos específicos não têm cobertura comprovada nesta versão.", 13, this.MUTED, false);
         button(disclosure2, "Prontidão dos monitores", false, () -> this.readReadiness()).setEnabled(connected() || this.demo);
+        label(disclosure2, DiagnosisScreen.READINESS_HINT, 12, this.MUTED, false);
         button(disclosure2, "VIN e calibração", false, () -> this.readVehicleInfo()).setEnabled(connected() || this.demo);
         button(disclosure2, "Quadro congelado", false, () -> this.readFreezeFrame()).setEnabled(connected() || this.demo);
+        label(disclosure2, DiagnosisScreen.FREEZE_FRAME_HINT, 12, this.MUTED, false);
         button(disclosure2, "Apagar falhas e monitores", false, () -> this.confirmClear()).setEnabled(connected() && !this.busy);
     }
 
@@ -1150,7 +1153,8 @@ public final class MainActivity extends Activity {
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
                         + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas. "
-                        + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados.\n\n"
+                        + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados. "
+                        + "Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços digitados ali não são detectados.\n\n"
                         + "Relatórios só saem quando você escolhe onde salvar ou compartilhar. Para apagar tudo: Configurações do Android › Apps › BorbaCar Labs › Limpar dados."));
         button(this.body, Motion.reduced(this) ? "Animações: reduzidas" : "Animações: suaves", false, () -> {
             if (Motion.saveReduced(this, !Motion.reduced(this))) {
@@ -1826,7 +1830,7 @@ public final class MainActivity extends Activity {
         }
         if (this.demo || connected()) {
             if (activeVehicle() != null) {
-                new AlertDialog.Builder(this).setTitle("Leitura guiada").setMessage("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n".concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
+                new AlertDialog.Builder(this).setTitle("Leitura guiada").setMessage(("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n" + DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT + "\n\n").concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
             } else {
                 navigate(2);
                 message("Crie um perfil, mesmo parcial, para guardar o contexto desta leitura.");
@@ -2667,9 +2671,23 @@ public final class MainActivity extends Activity {
         for (String label : request.labels.values()) {
             preview.append("• ").append(label).append("\n");
         }
-        preview.append("• Sintomas declarados nesta investigação\n\n")
-                .append("Não são enviados: nome do perfil, VIN, notas, adaptador, identificadores ou horários. ")
-                .append("A resposta é gerada por IA (Claude) e não substitui a avaliação de um profissional.");
+        JSONObject symptoms = request.body.optJSONObject("symptoms");
+        if (symptoms != null) {
+            String[][] fields = {{"description", "Sintoma"}, {"when", "Quando"}, {"frequency", "Frequência"}, {"conditions", "Condições"}};
+            for (String[] field : fields) {
+                String text = symptoms.optString(field[0], "");
+                if (!text.isEmpty()) {
+                    preview.append("• ").append(field[1]).append(": \"").append(text).append("\"\n");
+                }
+            }
+        }
+        preview.append("\n");
+        if (!request.removed.isEmpty()) {
+            preview.append("Removido do texto antes do envio: ").append(request.removed).append(".\n");
+        }
+        preview.append("Não são enviados: nome do perfil, VIN, notas, adaptador, identificadores ou horários. ")
+                .append("Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços não são detectados, então confira o texto acima. ")
+                .append("A resposta é gerada por IA e não substitui a avaliação de um profissional.");
         new AlertDialog.Builder(this).setTitle("Enviar para análise por IA?").setMessage(preview.toString())
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Enviar", (dialog, which) -> {
@@ -2680,7 +2698,7 @@ public final class MainActivity extends Activity {
                             post(() -> message("Análise por IA · " + result.model, result.display(request.labels)
                                     + "\n\nGerado por IA a partir dos dados enviados. São possibilidades, não um diagnóstico confirmado."));
                         } catch (Exception e) {
-                            post(() -> message("Análise por IA", error(e)));
+                            post(() -> message("Análise por IA", AnalysisClient.userMessage(e)));
                         }
                     }, "borbacar-ai").start();
                 }).show();

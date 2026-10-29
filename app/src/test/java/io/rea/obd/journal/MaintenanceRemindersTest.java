@@ -48,10 +48,69 @@ public class MaintenanceRemindersTest {
     }
 
     @Test
-    public void aNewerServiceSupersedesTheOldReminder() {
+    public void aNewerEntryOfTheSameServiceReplacesTheOldReminder() {
         List<JournalEntry> entries = Arrays.asList(
-                service("old", T, "Troca antiga", "2026-11-11", null),
-                service("new", T + 1000, "Troca nova", "2027-05-10", null));
+                service("old", T, "Troca de óleo", "2026-11-11", null),
+                service("new", T + 1000, "troca de oleo", "2027-05-10", null));
         assertTrue(MaintenanceReminders.due(entries, TODAY).isEmpty());
+    }
+
+    @Test
+    public void anotherServiceDoesNotHideAReminder() {
+        List<JournalEntry> entries = Arrays.asList(
+                service("oil", T, "Troca de óleo", "2026-11-11", null),
+                service("tires", T + 1000, "Rodízio de pneus", "2027-05-10", null));
+        List<MaintenanceReminders.Due> due = MaintenanceReminders.due(entries, TODAY);
+        assertEquals(1, due.size());
+        assertEquals("Troca de óleo", due.get(0).title);
+        assertEquals("vence em 1 dia (11/11)", due.get(0).detail);
+    }
+
+    @Test
+    public void everyDueServiceIsListedWithOverdueFirst() {
+        List<JournalEntry> entries = Arrays.asList(
+                service("oil", T, "Troca de óleo", "2026-11-12", null),
+                service("belt", T + 1000, "Correia dentada", null, "48000"),
+                service("tires", T + 2000, "Rodízio de pneus", "2026-11-15", null));
+        List<MaintenanceReminders.Due> due = MaintenanceReminders.due(entries, TODAY);
+        assertEquals(3, due.size());
+        assertEquals("Correia dentada", due.get(0).title);
+        assertTrue(due.get(0).overdue);
+        assertEquals("Rodízio de pneus", due.get(1).title);
+        assertEquals("Troca de óleo", due.get(2).title);
+    }
+
+    @Test
+    public void doingTheServiceAgainWithoutANewDateCompletesTheReminder() {
+        List<JournalEntry> entries = Arrays.asList(
+                service("planned", T, "Troca de óleo", "2026-11-11", null),
+                service("done", T + 1000, "Troca de óleo.", null, null));
+        assertTrue(MaintenanceReminders.due(entries, TODAY).isEmpty());
+    }
+
+    @Test
+    public void voidingTheNewerEntryBringsTheReminderBack() {
+        JournalEntry done = service("done", T + 1000, "Troca de óleo", null, null).withVoided(true, T + 2000);
+        List<JournalEntry> entries = Arrays.asList(service("planned", T, "Troca de óleo", "2026-11-11", null), done);
+        assertEquals(1, MaintenanceReminders.due(entries, TODAY).size());
+    }
+
+    @Test
+    public void nextServiceIsTheSoonestNotTheLatestRegistered() {
+        List<JournalEntry> entries = Arrays.asList(
+                service("oil", T, "Troca de óleo", "2026-11-11", null),
+                service("belt", T + 500, "Correia dentada", null, "60000"),
+                service("tires", T + 1000, "Rodízio de pneus", "2027-05-10", null));
+        assertEquals("oil", MaintenanceReminders.next(entries, "car").id);
+        assertEquals("belt", MaintenanceReminders.next(Arrays.asList(entries.get(1)), "car").id);
+        assertEquals(null, MaintenanceReminders.next(entries, "car2"));
+    }
+
+    @Test
+    public void remindersOfDifferentVehiclesAreIndependent() {
+        JournalEntry other = new JournalEntry("other", "car2", "Onix", JournalEntry.Kind.SERVICE, 1, T + 1000, T + 1000, T + 1000, "Troca de óleo",
+                new BigDecimal("10000"), null, null, null, false, false, null, null);
+        List<JournalEntry> entries = Arrays.asList(service("oil", T, "Troca de óleo", "2026-11-11", null), other);
+        assertEquals(1, MaintenanceReminders.due(entries, TODAY).size());
     }
 }

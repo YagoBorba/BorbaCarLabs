@@ -46,6 +46,23 @@ public class AnalysisContractTest {
     }
 
     @Test
+    public void symptomsAreSentWithoutContactDataOrPlates() throws JSONException {
+        VehicleProfile profile = new VehicleProfile(VEHICLE_ID, "Carro", "Chevrolet", "Cobalt", 2019, "BR",
+                "LTZ", "1.8", "Flex", "Automático", "");
+        DiagnosticCase diagnosticCase = DiagnosticCaseBuilder.create(profile, "adapter",
+                DtcDemoScenario.create(VEHICLE_ID, "session-1", NOW), Collections.emptyList(),
+                new DiagnosticCase.Symptoms("Placa ABC1D23 falhando, me liga (41) 99876-5432", "Motor frio",
+                        "yago@example.com", "P0300 acima de 2500 rpm"), NOW);
+        AnalysisRequest request = AnalysisRequest.from(diagnosticCase);
+        String sent = request.body.toString();
+        assertFalse(sent.contains("ABC1D23"));
+        assertFalse(sent.contains("99876"));
+        assertFalse(sent.contains("yago@example.com"));
+        assertTrue(sent.contains("P0300 acima de 2500 rpm"));
+        assertEquals("1 telefone, 1 placa, 1 e-mail", request.removed);
+    }
+
+    @Test
     public void everyObservationHasASyntheticReference() throws JSONException {
         AnalysisRequest request = request();
         JSONArray observations = request.body.getJSONArray("observations");

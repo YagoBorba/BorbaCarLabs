@@ -75,3 +75,5 @@ jobs:
       - run: npm ci
       - name: Sintaxe
         run: node --check server.mjs
+      - name: Testes
+        run: npm test

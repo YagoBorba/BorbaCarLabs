@@ -13,6 +13,12 @@ import org.json.JSONObject;
 public final class AnalysisResult {
     private static final List<String> CONFIDENCE = Arrays.asList("baixa", "media", "alta");
 
+    public static final class ContractException extends JSONException {
+        ContractException(String message) {
+            super(message);
+        }
+    }
+
     public static final class Hypothesis {
         public final String title;
         public final String reasoning;
@@ -50,26 +56,26 @@ public final class AnalysisResult {
 
         JSONArray hypotheses2 = analysis.getJSONArray("hypotheses");
         if (hypotheses2.length() > 5) {
-            throw new JSONException("Resposta da IA com hipóteses demais");
+            throw new ContractException("Resposta da IA com hipóteses demais");
         }
         List<Hypothesis> hypotheses = new ArrayList<>();
         for (int i = 0; i < hypotheses2.length(); i++) {
             JSONObject item = hypotheses2.getJSONObject(i);
             JSONArray cited = item.getJSONArray("evidence");
             if (cited.length() == 0) {
-                throw new JSONException("Hipótese da IA sem evidência citada");
+                throw new ContractException("Hipótese da IA sem evidência citada");
             }
             List<String> evidence = new ArrayList<>();
             for (int i2 = 0; i2 < cited.length(); i2++) {
                 String ref = cited.getString(i2);
                 if (!refs.contains(ref)) {
-                    throw new JSONException("A IA citou uma evidência que não foi enviada: " + ref);
+                    throw new ContractException("A IA citou uma evidência que não foi enviada: " + ref);
                 }
                 evidence.add(ref);
             }
             String confidence = item.getString("confidence");
             if (!CONFIDENCE.contains(confidence)) {
-                throw new JSONException("Confiança fora do contrato: " + confidence);
+                throw new ContractException("Confiança fora do contrato: " + confidence);
             }
             hypotheses.add(new Hypothesis(
                     text(item, "title", 160, false),
@@ -81,7 +87,7 @@ public final class AnalysisResult {
 
         JSONArray gaps = analysis.getJSONArray("missing_information");
         if (gaps.length() > 8) {
-            throw new JSONException("Resposta da IA com lacunas demais");
+            throw new ContractException("Resposta da IA com lacunas demais");
         }
         List<String> missing = new ArrayList<>();
         for (int i = 0; i < gaps.length(); i++) {
@@ -122,14 +128,14 @@ public final class AnalysisResult {
     private static String text(JSONObject object, String key, int max, boolean allowEmpty) throws JSONException {
         String text = object.getString(key).trim();
         if (text.isEmpty() && !allowEmpty) {
-            throw new JSONException("Campo vazio na resposta da IA: " + key);
+            throw new ContractException("Campo vazio na resposta da IA: " + key);
         }
         return bounded(text, max);
     }
 
     private static String bounded(String text, int max) throws JSONException {
         if (text.length() > max) {
-            throw new JSONException("Texto longo demais na resposta da IA");
+            throw new ContractException("Texto longo demais na resposta da IA");
         }
         return text;
     }
