@@ -14,6 +14,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import io.rea.obd.MainActivity;
 import io.rea.obd.R;
+import io.rea.obd.ui.I18n;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -84,7 +85,8 @@ public final class ReminderReceiver extends BroadcastReceiver {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         Set<String> notified = new HashSet<>(prefs.getStringSet("notified", new HashSet<>()));
         NotificationManager manager = context.getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Lembretes de manutenção", NotificationManager.IMPORTANCE_DEFAULT));
+        I18n.init(context);
+        manager.createNotificationChannel(new NotificationChannel(CHANNEL, I18n.t("Lembretes de manutenção"), NotificationManager.IMPORTANCE_DEFAULT));
         int posted = 0;
         for (MaintenanceReminders.Due reminder : due) {
             if (!notified.add(reminder.key)) {
@@ -92,9 +94,9 @@ public final class ReminderReceiver extends BroadcastReceiver {
             }
             Notification notification = new Notification.Builder(context, CHANNEL)
                     .setSmallIcon(R.drawable.ic_garage)
-                    .setContentTitle((reminder.overdue ? "Manutenção atrasada · " : "Manutenção próxima · ") + reminder.vehicleName)
-                    .setContentText(reminder.title + " · " + reminder.detail)
-                    .setStyle(new Notification.BigTextStyle().bigText(reminder.title + "\n" + reminder.detail + "\nConforme o lembrete registrado no Diário."))
+                    .setContentTitle(I18n.t(reminder.overdue ? "Manutenção atrasada" : "Manutenção próxima") + " · " + reminder.vehicleName)
+                    .setContentText(I18n.t(reminder.title) + " · " + I18n.t(reminder.detail))
+                    .setStyle(new Notification.BigTextStyle().bigText(I18n.t(reminder.title) + "\n" + I18n.t(reminder.detail) + "\n" + I18n.t("Conforme o lembrete registrado no Diário.")))
                     .setContentIntent(PendingIntent.getActivity(context, 0, new Intent(context, MainActivity.class), PendingIntent.FLAG_IMMUTABLE))
                     .setAutoCancel(true)
                     .build();

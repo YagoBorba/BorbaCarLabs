@@ -59,18 +59,18 @@ public final class DashboardScreen {
             this.lastState = dashboardState;
             for (Map.Entry<Integer, TextView> entry : this.values.entrySet()) {
                 DashboardState.Reading reading = entry.getKey().intValue() == 12 ? dashboardState.rpm : dashboardState.readings.get(entry.getKey());
-                entry.getValue().setText(reading.value);
-                this.qualities.get(entry.getKey()).setText(reading.quality);
-                this.origins.get(entry.getKey()).setText(reading.origin);
+                entry.getValue().setText(I18n.t(reading.value));
+                this.qualities.get(entry.getKey()).setText(I18n.t(reading.quality));
+                this.origins.get(entry.getKey()).setText(I18n.t(reading.origin));
                 this.origins.get(entry.getKey()).setVisibility(reading.origin.equals("Dado simulado") ? View.GONE : View.VISIBLE);
-                this.times.get(entry.getKey()).setText(reading.time);
-                entry.getValue().setContentDescription(reading.sensor.name + ": " + reading.value + " " + reading.sensor.unit + ". " + reading.quality + ". " + reading.origin);
-                this.details.get(entry.getKey()).setContentDescription("Abrir detalhes de " + reading.sensor.name + ". " + reading.value + " " + reading.sensor.unit + ". " + reading.quality + ". " + reading.origin + ". " + reading.time);
+                this.times.get(entry.getKey()).setText(I18n.t(reading.time));
+                entry.getValue().setContentDescription(I18n.t(reading.sensor.name) + ": " + reading.value + " " + reading.sensor.unit + ". " + I18n.t(reading.quality) + ". " + I18n.t(reading.origin));
+                this.details.get(entry.getKey()).setContentDescription(I18n.t("Abrir detalhes de " + reading.sensor.name) + ". " + reading.value + " " + reading.sensor.unit + ". " + I18n.t(reading.quality) + ". " + I18n.t(reading.origin) + ". " + I18n.t(reading.time));
             }
-            this.coverage.setText(dashboardState.coverage);
+            this.coverage.setText(I18n.t(dashboardState.coverage));
             this.voltage.setText(voltage);
-            this.voltageInfo.setText(text);
-            this.recordingInfo.setText(dashboardState.recording + "\n" + text5);
+            this.voltageInfo.setText(I18n.t(text));
+            this.recordingInfo.setText(I18n.t(dashboardState.recording + "\n" + text5));
             boolean flag = dashboardState.collecting && dashboardState.rpm.selected && dashboardState.rpm.status == TelemetrySample.Status.VALID;
             TextView textView = this.chartContext;
             if (list.isEmpty()) {
@@ -82,13 +82,13 @@ public final class DashboardScreen {
                 builder.append(text3);
                 string = builder.toString();
             }
-            textView.setText(string);
+            textView.setText(I18n.t(string));
             this.chart.data(list, "rpm");
             TextView chartRange = this.chartRange;
             StringBuilder builder2 = new StringBuilder();
             builder2.append(this.chart.summary());
             builder2.append(rpmHistorySessionId.isEmpty() ? "" : "\nSessão de aquisição: " + rpmHistorySessionId);
-            chartRange.setText(builder2.toString());
+            chartRange.setText(I18n.t(builder2.toString()));
         }
     }
 
@@ -233,7 +233,7 @@ public final class DashboardScreen {
         } else {
             text = Format.when(point.time) + " · " + String.format(Locale.getDefault(), "%.0f rpm", Double.valueOf(point.value)) + " · amostra histórica selecionada";
         }
-        textView.setText(text);
+        textView.setText(I18n.t(text));
     }
 
     private static void sensor(final LinearLayout linearLayout, final DashboardState.Reading reading, final Views views, final UiKit uiKit, boolean flag) {
@@ -271,6 +271,6 @@ public final class DashboardScreen {
         }
         ScrollView scrollView = new ScrollView(linearLayout.getContext());
         scrollView.addView(column);
-        new AlertDialog.Builder(linearLayout.getContext()).setTitle("Detalhes da captura").setView(scrollView).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(linearLayout.getContext()).setTitle("Detalhes da captura").setView(scrollView).setPositiveButton("Fechar", null).show();
     }
 }

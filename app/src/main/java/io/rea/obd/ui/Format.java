@@ -39,16 +39,17 @@ public final class Format {
     }
 
     public static String km(java.math.BigDecimal dueOdometer) {
-        java.text.NumberFormat format = java.text.NumberFormat.getIntegerInstance(new java.util.Locale("pt", "BR"));
+        java.text.NumberFormat format = java.text.NumberFormat.getIntegerInstance(I18n.locale());
         return format.format(dueOdometer) + " km";
     }
 
     public static String decimal(java.math.BigDecimal bigDecimal) {
-        return bigDecimal.toPlainString().replace('.', ',');
+        return I18n.english() ? bigDecimal.toPlainString() : bigDecimal.toPlainString().replace('.', ',');
     }
 
     public static String money(java.math.BigDecimal bigDecimal) {
-        java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("pt", "BR"));
+        java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance(I18n.locale());
+        format.setCurrency(java.util.Currency.getInstance("BRL"));
         return format.format(bigDecimal).replace(' ', ' ');
     }
 }

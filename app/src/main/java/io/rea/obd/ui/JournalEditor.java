@@ -325,7 +325,7 @@ public final class JournalEditor {
     }
 
     private static String decimal(BigDecimal bigDecimal) {
-        return bigDecimal == null ? "" : bigDecimal.toPlainString().replace('.', ',');
+        return bigDecimal == null ? "" : Format.decimal(bigDecimal);
     }
 
     private EditText field(LinearLayout linearLayout, String text, String title, String serverUrl, Bundle bundle, boolean flag, int i) {
@@ -361,7 +361,7 @@ public final class JournalEditor {
 
     private CheckBox check(LinearLayout linearLayout, String text, String tag, boolean checked) {
         CheckBox checkBox = new CheckBox(this.host);
-        checkBox.setText(text);
+        checkBox.setText(I18n.t(text));
         checkBox.setTextColor(this.ui.palette.text);
         checkBox.setTextSize(14.0f);
         checkBox.setMinHeight(this.ui.dp(48));
@@ -392,8 +392,8 @@ public final class JournalEditor {
     }
 
     private void updateTimeLabels() {
-        this.dateButton.setText("Data: " + time().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-        this.timeButton.setText("Horário: " + time().format(DateTimeFormatter.ofPattern("HH:mm")));
+        this.dateButton.setText(I18n.t("Data: " + time().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+        this.timeButton.setText(I18n.t("Horário: " + time().format(DateTimeFormatter.ofPattern("HH:mm"))));
     }
 
     public void pickDue() {
@@ -412,7 +412,7 @@ public final class JournalEditor {
         } else {
             text = "Próxima data: " + LocalDate.parse(this.dueDate).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
         }
-        button.setText(text);
+        button.setText(I18n.t(text));
     }
 
     private String value(String text) {
@@ -465,7 +465,7 @@ public final class JournalEditor {
             });
         } catch (Exception e) {
             setSaving(false);
-            this.error.setText(e.getMessage());
+            this.error.setText(I18n.t(e.getMessage()));
         }
     }
 
@@ -476,7 +476,7 @@ public final class JournalEditor {
                 this.dialog.dismiss();
                 return;
             }
-            this.error.setText(text);
+            this.error.setText(I18n.t(text));
             this.saveButton.setEnabled(true);
             this.cancelButton.setEnabled(true);
         }
@@ -484,7 +484,7 @@ public final class JournalEditor {
 
     private void setSaving(boolean saving) {
         this.saving = saving;
-        this.saveButton.setText(saving ? "Salvando…" : "Salvar registro");
+        this.saveButton.setText(I18n.t(saving ? "Salvando…" : "Salvar registro"));
         enable(this.form, !saving);
         CheckBox checkBox = this.complete;
         if (checkBox != null) {

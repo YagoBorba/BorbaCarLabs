@@ -42,6 +42,14 @@ O usuário envia um JSON com o tipo do veículo, observações (cada uma com um 
 - Seja breve: resumo com até 3 frases e raciocínio com até 3 frases por hipótese.
 - Se "demonstration_data" for true, os dados são simulados: comece o resumo com "Dados simulados:".`;
 
+const ENGLISH = `
+- Prevalece sobre o idioma indicado acima: escreva todos os textos em inglês (en-US), em linguagem simples para um motorista leigo, mantendo "confidence" como "baixa", "media" ou "alta".
+- Se "demonstration_data" for true, comece o resumo com "Simulated data:".`;
+
+function systemFor(kase) {
+  return kase.language === "en" ? SYSTEM + ENGLISH : SYSTEM;
+}
+
 const ANALYSIS_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -90,7 +98,7 @@ async function analyzeWithGemini(kase, attempt) {
   try {
     interaction = await gemini.interactions.create({
       model: MODEL,
-      system_instruction: SYSTEM,
+      system_instruction: systemFor(kase),
       input: JSON.stringify(kase),
       response_format: { type: "text", mime_type: "application/json", schema: withoutClosedObjects(ANALYSIS_SCHEMA) },
     });
@@ -131,7 +139,7 @@ async function analyzeWithClaude(kase, attempt) {
     model: MODEL,
     max_tokens: 4000,
     output_config: { effort: "low", format: { type: "json_schema", schema: ANALYSIS_SCHEMA } },
-    system: SYSTEM,
+    system: systemFor(kase),
     messages: [{ role: "user", content: JSON.stringify(kase) }],
   };
   let response;

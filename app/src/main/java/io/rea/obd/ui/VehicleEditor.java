@@ -306,7 +306,7 @@ public final class VehicleEditor {
         Iterator<VehicleCatalog.Configuration> it = configurations.iterator();
         while (true) {
             if (!it.hasNext()) {
-                new AlertDialog.Builder(this.activity).setTitle("Versão documentada · escolha a sua").setItems((CharSequence[]) items.toArray(new String[0]), (dialog, which) -> {
+                new LocalizedDialog(this.activity).setTitle("Versão documentada · escolha a sua").setItems((CharSequence[]) items.toArray(new String[0]), (dialog, which) -> {
                     try {
                         this.draft.chooseConfiguration(this.catalog, ((VehicleCatalog.Configuration) configurations.get(which)).id);
                         this.warning = "";
@@ -339,7 +339,7 @@ public final class VehicleEditor {
         builder.append(VehiclePresentation.title(key));
         builder.append(". ");
         builder.append(attribute.value == null ? "Opcional" : attribute.value);
-        button.setContentDescription(builder.toString());
+        button.setContentDescription(I18n.t(builder.toString()));
         button.setTag("vehicle-field-" + key.name());
         if (attribute.value != null) {
             this.ui.label(this.content, VehiclePresentation.compactOrigin(attribute), 12, UiKit.MUTED, false);
@@ -353,7 +353,7 @@ public final class VehicleEditor {
         items.add("Não sei");
         items.addAll(emptyList);
         items.add("Não encontrei · informar por conta própria");
-        AlertDialog.Builder builder = new AlertDialog.Builder(this.activity);
+        AlertDialog.Builder builder = new LocalizedDialog(this.activity);
         StringBuilder builder2 = new StringBuilder();
         builder2.append(VehiclePresentation.title(key));
         builder2.append(emptyList.isEmpty() ? " · sem opções no catálogo" : " · catálogo");
@@ -404,7 +404,7 @@ public final class VehicleEditor {
         }
         ScrollView scrollView = new ScrollView(this.activity);
         scrollView.addView(column);
-        final AlertDialog manualEntry = new AlertDialog.Builder(this.activity).setTitle("Informar · " + VehiclePresentation.title(key)).setView(scrollView).setNegativeButton("Cancelar", null).setPositiveButton("Declarar informação", null).create();
+        final AlertDialog manualEntry = new LocalizedDialog(this.activity).setTitle("Informar · " + VehiclePresentation.title(key)).setView(scrollView).setNegativeButton("Cancelar", null).setPositiveButton("Declarar informação", null).create();
         this.manualEntry = manualEntry;
         manualEntry.setOnShowListener(new DialogInterface.OnShowListener() {
             @Override

@@ -66,6 +66,18 @@ test("valid answer is returned and counted", async () => {
   assert.equal((await app.health()).remaining_today, 4);
 });
 
+test("answer language follows the request and defaults to Portuguese", async () => {
+  const seen = [];
+  const app = await start(async (kase, attempt) => {
+    seen.push(kase.language);
+    return answering(ANSWER)(kase, attempt);
+  });
+  await app.post({ ...CASE, language: "en" });
+  await app.post(CASE);
+  await app.post({ ...CASE, language: "fr" });
+  assert.deepEqual(seen, ["en", "pt-BR", "pt-BR"]);
+});
+
 test("wrong token is rejected without using quota", async () => {
   const app = await start(answering(ANSWER));
   const res = await app.post(CASE, "wrong-token-0123456789");

@@ -46,6 +46,7 @@ export function acceptCase(body) {
     demonstration_data: body.demonstration_data === true,
     observations: body.observations,
     symptoms: body.symptoms ?? {},
+    language: body.language === "en" ? "en" : "pt-BR",
   };
   return { kase, refs };
 }

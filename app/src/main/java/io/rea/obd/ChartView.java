@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewParent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import io.rea.obd.telemetry.DashboardState;
+import io.rea.obd.ui.I18n;
 import io.rea.obd.ui.ThemePalette;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -65,7 +66,7 @@ public final class ChartView extends View {
         setClickable(true);
         setFocusable(true);
         setMinimumHeight(dp(150.0f));
-        setContentDescription("Gráfico de capturas. Sem amostras.");
+        setContentDescription(I18n.t("Gráfico de capturas. Sem amostras."));
     }
 
     private int dp(float value) {
@@ -103,7 +104,7 @@ public final class ChartView extends View {
         if (selectedPoint != null && this.selected < 0 && (selectionListener = this.listener) != null) {
             selectionListener.selected(null);
         }
-        setContentDescription("Gráfico de capturas. " + summary() + " Use Amostra anterior e Próxima amostra para explorar.");
+        setContentDescription(I18n.t("Gráfico de capturas. " + summary() + " Use Amostra anterior e Próxima amostra para explorar."));
         int selected = this.selected;
         if (selected >= 0) {
             select(selected);
@@ -263,7 +264,7 @@ public final class ChartView extends View {
             selectionListener.selected(selectedPoint);
         }
         if (selectedPoint != null) {
-            setContentDescription(io.rea.obd.ui.Format.when(selectedPoint.time) + " · " + String.format(Locale.getDefault(), "%.0f %s", Double.valueOf(selectedPoint.value), this.unit) + " · captura histórica " + (i + 1) + " de " + this.points.size());
+            setContentDescription(I18n.t(io.rea.obd.ui.Format.when(selectedPoint.time) + " · " + String.format(Locale.getDefault(), "%.0f %s", Double.valueOf(selectedPoint.value), this.unit) + " · captura histórica " + (i + 1) + " de " + this.points.size()));
         }
         invalidate();
     }

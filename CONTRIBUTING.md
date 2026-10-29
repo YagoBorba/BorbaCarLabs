@@ -102,7 +102,7 @@ The CI must be green before merging. Pull requests are merged with a merge commi
 - Java 17, Android SDK only (no external runtime libraries).
 - Views are built in code through `UiKit` and `ThemePalette`.
 - Use Android constants (`View.GONE`, `Gravity.CENTER`, ...) instead of raw numbers.
-- Keep user-facing text in Brazilian Portuguese.
+- Write user-facing text in Brazilian Portuguese and add its English version to `app/src/main/res/raw/translations_en.json` (exact text in `exact`, text with numbers or names in `patterns`). `EnglishScreensTest` fails when a screen still shows Portuguese in English mode.
 
 ## Reporting Issues
 

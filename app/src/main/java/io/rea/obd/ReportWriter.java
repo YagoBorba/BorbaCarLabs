@@ -3,6 +3,7 @@ package io.rea.obd;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.pdf.PdfDocument;
+import io.rea.obd.ui.I18n;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -54,8 +55,8 @@ public final class ReportWriter {
                     }
                 }
                 canvas.drawLine(ReportLayout.LEFT, 812.0f, ReportLayout.RIGHT, 812.0f, rule);
-                canvas.drawText("BorbaCar Labs · relatório local · " + generated, ReportLayout.LEFT, 826.0f, small);
-                String number = "página " + (i + 1) + " de " + total;
+                canvas.drawText(I18n.t("BorbaCar Labs · relatório local · " + generated), ReportLayout.LEFT, 826.0f, small);
+                String number = I18n.t("página " + (i + 1) + " de " + total);
                 canvas.drawText(number, ReportLayout.RIGHT - small.measureText(number), 826.0f, small);
                 pdfDocument.finishPage(page);
                 page = null;
@@ -80,9 +81,9 @@ public final class ReportWriter {
             paint.setTextSize(9.5f);
             paint.setColor(BANNER_TEXT);
             paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-            canvas.drawText("DADOS SIMULADOS · nenhum veículo real foi consultado", ReportLayout.LEFT + 10.0f, 35.0f, paint);
+            canvas.drawText(I18n.t("DADOS SIMULADOS · nenhum veículo real foi consultado"), ReportLayout.LEFT + 10.0f, 35.0f, paint);
         } else {
-            canvas.drawText("BorbaCar Labs · relatório local", ReportLayout.LEFT, 34.0f, small);
+            canvas.drawText(I18n.t("BorbaCar Labs · relatório local"), ReportLayout.LEFT, 34.0f, small);
             canvas.drawLine(ReportLayout.LEFT, 42.0f, ReportLayout.RIGHT, 42.0f, rule);
         }
     }

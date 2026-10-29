@@ -99,6 +99,7 @@ public final class AnalysisRequest {
 
         JSONObject body = new JSONObject()
                 .put("schema", SCHEMA)
+                .put("language", io.rea.obd.ui.I18n.english() ? "en" : "pt-BR")
                 .put("vehicle", vehicle(diagnosticCase.vehicle, filter))
                 .put("read_complete", !diagnosticCase.dtc.incomplete())
                 .put("demonstration_data", diagnosticCase.dtc.origin == io.rea.obd.model.DataOrigin.SIMULATED)

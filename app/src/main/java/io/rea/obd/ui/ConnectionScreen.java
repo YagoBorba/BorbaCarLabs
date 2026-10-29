@@ -24,7 +24,7 @@ public final class ConnectionScreen {
         uiKit.label(column, Build.MANUFACTURER + " " + Build.MODEL, 18, UiKit.TEXT, true);
         uiKit.label(column, "Android " + Build.VERSION.RELEASE + " · API " + Build.VERSION.SDK_INT, 13, UiKit.MUTED, false);
         uiKit.label(column, "Conecte o scanner ao carro e escolha onde procurar. O app solicita as permissões necessárias e consulta as respostas do dispositivo escolhido.", 15, UiKit.TEXT, false);
-        final AlertDialog alertDialog = new AlertDialog.Builder(activity).setTitle("Encontrar meu scanner").setNegativeButton("Cancelar", null).create();
+        final AlertDialog alertDialog = new LocalizedDialog(activity).setTitle("Encontrar meu scanner").setNegativeButton("Cancelar", null).create();
         uiKit.button(column, "Ver dispositivos pareados", true, () -> {
             alertDialog.dismiss();
             actions.paired();
