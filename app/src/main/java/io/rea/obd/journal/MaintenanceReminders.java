@@ -1,12 +1,14 @@
 package io.rea.obd.journal;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public final class MaintenanceReminders {
@@ -32,24 +34,56 @@ public final class MaintenanceReminders {
     private MaintenanceReminders() {
     }
 
-    public static List<Due> due(List<JournalEntry> entries, LocalDate today) {
-        Map<String, JournalEntry> reminders = new HashMap<>();
-        Map<String, BigDecimal> odometers = new HashMap<>();
+    public static List<JournalEntry> active(List<JournalEntry> entries) {
+        Map<String, JournalEntry> latest = new HashMap<>();
         for (JournalEntry entry : entries) {
-            if (entry.voided) {
+            if (entry.voided || entry.kind != JournalEntry.Kind.SERVICE) {
                 continue;
             }
-            if (entry.odometer != null) {
-                odometers.merge(entry.vehicleId, entry.odometer, BigDecimal::max);
+            String service = entry.vehicleId + "|" + serviceKey(entry.note);
+            JournalEntry current = latest.get(service);
+            if (current == null || entry.occurredAt > current.occurredAt) {
+                latest.put(service, entry);
             }
-            boolean hasReminder = !entry.dueDate.isEmpty() || entry.dueOdometer != null;
-            JournalEntry current = reminders.get(entry.vehicleId);
-            if (entry.kind == JournalEntry.Kind.SERVICE && hasReminder && (current == null || entry.occurredAt > current.occurredAt)) {
-                reminders.put(entry.vehicleId, entry);
+        }
+        List<JournalEntry> active = new ArrayList<>();
+        for (JournalEntry entry : latest.values()) {
+            if (!entry.dueDate.isEmpty() || entry.dueOdometer != null) {
+                active.add(entry);
+            }
+        }
+        return active;
+    }
+
+    public static JournalEntry next(List<JournalEntry> entries, String vehicleId) {
+        JournalEntry next = null;
+        for (JournalEntry entry : active(entries)) {
+            if (entry.vehicleId.equals(vehicleId) && (next == null || sooner(entry, next))) {
+                next = entry;
+            }
+        }
+        return next;
+    }
+
+    private static boolean sooner(JournalEntry a, JournalEntry b) {
+        if (a.dueDate.isEmpty() != b.dueDate.isEmpty()) {
+            return !a.dueDate.isEmpty();
+        }
+        if (!a.dueDate.isEmpty()) {
+            return a.dueDate.compareTo(b.dueDate) < 0;
+        }
+        return a.dueOdometer.compareTo(b.dueOdometer) < 0;
+    }
+
+    public static List<Due> due(List<JournalEntry> entries, LocalDate today) {
+        Map<String, BigDecimal> odometers = new HashMap<>();
+        for (JournalEntry entry : entries) {
+            if (!entry.voided && entry.odometer != null) {
+                odometers.merge(entry.vehicleId, entry.odometer, BigDecimal::max);
             }
         }
         List<Due> due = new ArrayList<>();
-        for (JournalEntry reminder : reminders.values()) {
+        for (JournalEntry reminder : active(entries)) {
             List<String> reasons = new ArrayList<>();
             boolean overdue = false;
             if (!reminder.dueDate.isEmpty()) {
@@ -78,6 +112,12 @@ public final class MaintenanceReminders {
                 due.add(new Due(reminder.id + ":" + reminder.revision, reminder.vehicleName, title, String.join(" · ", reasons), overdue));
             }
         }
+        due.sort((a, b) -> a.overdue != b.overdue ? (a.overdue ? -1 : 1) : a.title.compareTo(b.title));
         return due;
+    }
+
+    static String serviceKey(String note) {
+        String text = Normalizer.normalize(note, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return text.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
     }
 }

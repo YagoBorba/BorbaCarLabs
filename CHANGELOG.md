@@ -1,5 +1,9 @@
 # Histórico de alterações
 
+## Em desenvolvimento
+
+- Lembretes de manutenção controlados por serviço: um serviço novo não esconde mais o lembrete de outro (troca de óleo + rodízio de pneus), registrar o mesmo serviço sem novo prazo conclui o lembrete e a tela Hoje mostra o próximo a vencer, não o último cadastrado.
+
 ## 1.0.2 / Ferramentas — 28/10/2026
 
 - Android Gradle Plugin 8.13.2 e Gradle 8.14.6; o lint mais rígido dessa versão passa sem erros, com as chamadas Bluetooth marcadas onde a permissão já foi pedida pela tela de conexão.
