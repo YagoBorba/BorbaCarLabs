@@ -14,6 +14,7 @@ import io.rea.obd.journal.FuelSummary;
 import io.rea.obd.journal.JournalEntry;
 import io.rea.obd.journal.JournalJson;
 import io.rea.obd.journal.JournalStore;
+import io.rea.obd.journal.MaintenanceReminders;
 import io.rea.obd.vehicle.VehicleProfile;
 import java.io.File;
 import java.io.FileInputStream;
@@ -81,7 +82,6 @@ public final class JournalController {
             return null;
         }
         int count = 0;
-        JournalEntry reminder = null;
         JournalEntry lastFill = null;
         for (JournalEntry entry : this.entries) {
             if (!entry.vehicleId.equals(vehicle.id) || entry.voided) {
@@ -91,12 +91,8 @@ public final class JournalController {
             if (entry.kind == JournalEntry.Kind.FUEL && (lastFill == null || entry.occurredAt > lastFill.occurredAt)) {
                 lastFill = entry;
             }
-            boolean hasReminder = !entry.dueDate.isEmpty() || entry.dueOdometer != null;
-            if (entry.kind == JournalEntry.Kind.SERVICE && hasReminder && (reminder == null || entry.occurredAt > reminder.occurredAt)) {
-                reminder = entry;
-            }
         }
-        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), reminder, lastFill == null ? "" : lastFill.fuel);
+        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id), lastFill == null ? "" : lastFill.fuel);
     }
 
     public interface Host {
