@@ -137,7 +137,7 @@ public final class DiagnosisScreen {
             progressBar.setMax(2);
             progressBar.setProgress(i);
             progressBar.setProgressTintList(ColorStateList.valueOf(uiKit.palette.accent));
-            progressBar.setContentDescription(i + " de 2 grupos de consultas encerrados");
+            progressBar.setContentDescription(I18n.t(i + " de 2 grupos de consultas encerrados"));
             linearLayout.addView(progressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, uiKit.dp(8)));
         }
     }

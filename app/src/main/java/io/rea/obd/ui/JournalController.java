@@ -168,7 +168,7 @@ public final class JournalController {
         }
         LinearLayout column = uiKit.column();
         linearLayout.addView(column);
-        uiKit.button(column, "Novo registro", true, () -> new AlertDialog.Builder(this.activity).setTitle("O que você quer registrar?").setItems(new String[]{"Sintoma", "Serviço", "Abastecimento"}, (dialog, which) -> open(JournalEntry.Kind.values()[which], null, null)).setNegativeButton("Cancelar", null).show()).setEnabled((vehicle == null || this.host.demo() || this.saving) ? false : true);
+        uiKit.button(column, "Novo registro", true, () -> new LocalizedDialog(this.activity).setTitle("O que você quer registrar?").setItems(new String[]{"Sintoma", "Serviço", "Abastecimento"}, (dialog, which) -> open(JournalEntry.Kind.values()[which], null, null)).setNegativeButton("Cancelar", null).show()).setEnabled((vehicle == null || this.host.demo() || this.saving) ? false : true);
         if (this.host.demo()) {
             uiKit.label(column, "Encerre a demonstração para registrar acontecimentos reais informados por você.", 13, UiKit.AMBER, false);
         }
@@ -176,7 +176,7 @@ public final class JournalController {
             final FuelSummary latest = FuelSummary.latest(this.entries, vehicle.id);
             LinearLayout card = uiKit.card(linearLayout, false);
             uiKit.eyebrow(card, "CONSUMO POR ABASTECIMENTOS");
-            uiKit.label(card, latest.kmPerLiter == null ? "Aguardando um intervalo completo" : latest.kmPerLiter.toPlainString().replace('.', ',') + " km/L", 24, UiKit.TEXT, true);
+            uiKit.label(card, latest.kmPerLiter == null ? "Aguardando um intervalo completo" : Format.decimal(latest.kmPerLiter) + " km/L", 24, UiKit.TEXT, true);
             uiKit.label(card, latest.explanation, 13, UiKit.MUTED, false);
             if (latest.kmPerLiter != null) {
                 uiKit.button(card, "Como foi calculado", false, () -> message("Distância: " + latest.distance + " km\nVolume: " + latest.liters + " L\n" + latest.explanation + "\nEntradas e revisões: " + String.join(", ", latest.entryRevisions)));
@@ -193,7 +193,7 @@ public final class JournalController {
         }
         final String[] parts = {"Todos", "Sintomas", "Serviços", "Abastecimentos"};
         uiKit.button(linearLayout, "Filtrar: " + parts[this.filter], false, () -> {
-            new AlertDialog.Builder(this.activity).setTitle("Mostrar registros").setItems(parts, (dialog, which) -> {
+            new LocalizedDialog(this.activity).setTitle("Mostrar registros").setItems(parts, (dialog, which) -> {
                 this.filter = which;
                 this.limit = 20;
                 this.host.changed();
@@ -320,13 +320,13 @@ public final class JournalController {
                 uiKit.label(column, line, 14, UiKit.TEXT, false);
             }
         }
-        final AlertDialog alertDialog = new AlertDialog.Builder(this.activity).setTitle(journalEntry.title()).setPositiveButton("Fechar", null).create();
+        final AlertDialog alertDialog = new LocalizedDialog(this.activity).setTitle(journalEntry.title()).setPositiveButton("Fechar", null).create();
         uiKit.button(column, "Corrigir registro", false, () -> {
             alertDialog.dismiss();
             open(journalEntry.kind, journalEntry, null);
         }).setEnabled((journalEntry.voided || this.saving || this.host.demo() || this.host.vehicle() == null || !this.host.vehicle().id.equals(journalEntry.vehicleId)) ? false : true);
         uiKit.button(column, journalEntry.voided ? "Reativar registro" : "Anular registro", false, () -> {
-            new AlertDialog.Builder(this.activity).setTitle(journalEntry.voided ? "Reativar registro?" : "Anular registro?").setMessage("Isso cria uma revisão e recalcula custos e consumo. As revisões anteriores continuam preservadas. Anule somente registros que não devem entrar nos cálculos.").setNegativeButton("Cancelar", null).setPositiveButton("Confirmar", (dialog, which) -> {
+            new LocalizedDialog(this.activity).setTitle(journalEntry.voided ? "Reativar registro?" : "Anular registro?").setMessage("Isso cria uma revisão e recalcula custos e consumo. As revisões anteriores continuam preservadas. Anule somente registros que não devem entrar nos cálculos.").setNegativeButton("Cancelar", null).setPositiveButton("Confirmar", (dialog, which) -> {
                 if (this.saving || this.host.demo()) {
                     return;
                 }
@@ -359,7 +359,7 @@ public final class JournalController {
                     for (int i = 0; i < size; i++) {
                         parts[i] = "Revisão " + ((JournalEntry) revisions.get(i)).revision + " · " + local(((JournalEntry) revisions.get(i)).revisedAt);
                     }
-                    new AlertDialog.Builder(this.activity).setTitle("Revisões preservadas").setItems(parts, (dialog, which) -> message(String.join("\n\n", JournalJson.lines((JournalEntry) revisions.get(which))))).setNegativeButton("Fechar", null).show();
+                    new LocalizedDialog(this.activity).setTitle("Revisões preservadas").setItems(parts, (dialog, which) -> message(String.join("\n\n", JournalJson.lines((JournalEntry) revisions.get(which))))).setNegativeButton("Fechar", null).show();
                 });
             } catch (Exception e) {
                 post(() -> message(e.getMessage()));
@@ -385,7 +385,7 @@ public final class JournalController {
         for (int i = 0; i < size; i++) {
             parts[i] = ((JournalEntry) items.get(i)).vehicleName + " · " + ((JournalEntry) items.get(i)).title() + " · " + local(((JournalEntry) items.get(i)).occurredAt);
         }
-        new AlertDialog.Builder(this.activity).setTitle("Perfis removidos · registros preservados").setItems(parts, (dialog, which) -> detail((JournalEntry) items.get(which))).setNegativeButton("Fechar", null).show();
+        new LocalizedDialog(this.activity).setTitle("Perfis removidos · registros preservados").setItems(parts, (dialog, which) -> detail((JournalEntry) items.get(which))).setNegativeButton("Fechar", null).show();
     }
 
     public void exportVehicle(VehicleProfile vehicleProfile) {
@@ -410,7 +410,7 @@ public final class JournalController {
             message("Conclua ou cancele a exportação anterior.");
             return;
         }
-        new AlertDialog.Builder(this.activity).setTitle("Revisar exportação").setMessage("O arquivo incluirá " + Format.count(list.size(), "registro", "registros") + " e suas revisões anteriores, com nomes, notas, datas, hodômetro, combustível e valores informados. Confira se deseja incluir esse conteúdo antes de escolher onde salvar. Não há envio automático pela internet.").setNegativeButton("Cancelar", null).setPositiveButton("Preparar arquivo", (dialog, which) -> prepareExport(list)).show();
+        new LocalizedDialog(this.activity).setTitle("Revisar exportação").setMessage("O arquivo incluirá " + Format.count(list.size(), "registro", "registros") + " e suas revisões anteriores, com nomes, notas, datas, hodômetro, combustível e valores informados. Confira se deseja incluir esse conteúdo antes de escolher onde salvar. Não há envio automático pela internet.").setNegativeButton("Cancelar", null).setPositiveButton("Preparar arquivo", (dialog, which) -> prepareExport(list)).show();
     }
 
     private void prepareExport(final List<JournalEntry> list) {
@@ -540,7 +540,7 @@ public final class JournalController {
     }
 
     private void message(String message) {
-        new AlertDialog.Builder(this.activity).setMessage(message).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(this.activity).setMessage(message).setPositiveButton("Fechar", null).show();
     }
 
     public Bundle state() throws Exception {

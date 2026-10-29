@@ -29,7 +29,7 @@ public final class Notice {
         UiKit ui = new UiKit(activity);
         TextView view = new TextView(activity);
         view.setTag(TAG);
-        view.setText(text);
+        view.setText(I18n.t(text));
         view.setTextSize(15.0f);
         view.setTextColor(ui.palette.bg);
         view.setPadding(ui.dp(18), ui.dp(14), ui.dp(18), ui.dp(14));
