@@ -847,7 +847,7 @@ public final class MainActivity extends Activity {
         if (this.demo || connected()) {
             button(feature, "Iniciar leitura guiada", true, () -> this.confirmGuidedRead()).setEnabled((this.busy || this.caseBusy) ? false : true);
             button(feature, this.busy ? "Leitura em andamento…" : "Ler só os códigos de falha", false, () -> this.scan()).setEnabled(!this.busy);
-            label(feature, "A leitura guiada também coleta prontidão dos monitores e quadro congelado.", 12, this.MUTED, false);
+            label(feature, "A leitura guiada também coleta a prontidão dos monitores e o quadro congelado.", 12, this.MUTED, false);
         }
         if (!this.guidedStatus.isEmpty()) {
             DiagnosisScreen.progress(feature, this.guidedCompleted, this.guidedStatus);
@@ -884,6 +884,7 @@ public final class MainActivity extends Activity {
             LinearLayout card = card(this.body);
             label(card, this.currentSupplement.incomplete() ? "COMPLEMENTO INCOMPLETO" : "COMPLEMENTO COLETADO", 11, this.AMBER, true);
             label(card, "Prontidão e quadro 00 têm estados e horários próprios. Salve uma investigação para preservar este complemento.", 13, this.MUTED, false);
+            label(card, DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT, 12, this.MUTED, false);
             button(card, "Ver prontidão e quadro coletados", false, () -> message(String.join("\n", SupplementalFormatter.lines(this.currentSupplement))));
         }
         uiKit.row(this.body, "Ao vivo", () -> navigate(0));
@@ -899,8 +900,10 @@ public final class MainActivity extends Activity {
         LinearLayout disclosure2 = uiKit.disclosure(this.body, "Ferramentas do scanner");
         label(disclosure2, "ABS, airbags e módulos específicos não têm cobertura comprovada nesta versão.", 13, this.MUTED, false);
         button(disclosure2, "Prontidão dos monitores", false, () -> this.readReadiness()).setEnabled(connected() || this.demo);
+        label(disclosure2, DiagnosisScreen.READINESS_HINT, 12, this.MUTED, false);
         button(disclosure2, "VIN e calibração", false, () -> this.readVehicleInfo()).setEnabled(connected() || this.demo);
         button(disclosure2, "Quadro congelado", false, () -> this.readFreezeFrame()).setEnabled(connected() || this.demo);
+        label(disclosure2, DiagnosisScreen.FREEZE_FRAME_HINT, 12, this.MUTED, false);
         button(disclosure2, "Apagar falhas e monitores", false, () -> this.confirmClear()).setEnabled(connected() && !this.busy);
     }
 
@@ -1826,7 +1829,7 @@ public final class MainActivity extends Activity {
         }
         if (this.demo || connected()) {
             if (activeVehicle() != null) {
-                new AlertDialog.Builder(this).setTitle("Leitura guiada").setMessage("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n".concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
+                new AlertDialog.Builder(this).setTitle("Leitura guiada").setMessage(("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n" + DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT + "\n\n").concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
             } else {
                 navigate(2);
                 message("Crie um perfil, mesmo parcial, para guardar o contexto desta leitura.");

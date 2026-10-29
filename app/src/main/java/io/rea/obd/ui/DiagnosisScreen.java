@@ -18,6 +18,9 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public final class DiagnosisScreen {
+    public static final String READINESS_HINT = "Prontidão dos monitores: quais autotestes de emissões o carro já concluiu desde que os códigos foram apagados ou a bateria desligada.";
+    public static final String FREEZE_FRAME_HINT = "Quadro congelado: valores dos sensores gravados pelo carro no instante em que a falha foi registrada.";
+
     private DiagnosisScreen() {
     }
 

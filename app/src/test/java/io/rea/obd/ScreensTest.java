@@ -1,5 +1,6 @@
 package io.rea.obd;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
@@ -40,6 +41,38 @@ public class ScreensTest {
         try (FileOutputStream out = new FileOutputStream(new File(OUT, name + ".png"))) {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
         }
+    }
+
+    private static String texts(View view) {
+        StringBuilder builder = new StringBuilder();
+        if (view instanceof android.widget.TextView) {
+            builder.append(((android.widget.TextView) view).getText()).append('\n');
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                builder.append(texts(group.getChildAt(i)));
+            }
+        }
+        return builder.toString();
+    }
+
+    @Test
+    public void screensExplainTermsAndDescribeRemindersAsTheyWork() {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.DIAGNOSIS);
+        idle();
+        String diagnosis = texts(activity.getWindow().getDecorView());
+        assertTrue(diagnosis.contains(io.rea.obd.ui.DiagnosisScreen.READINESS_HINT));
+        assertTrue(diagnosis.contains(io.rea.obd.ui.DiagnosisScreen.FREEZE_FRAME_HINT));
+        activity.navigate(NavigationState.JOURNAL);
+        idle();
+        String journal = texts(activity.getWindow().getDecorView());
+        assertTrue(journal.contains("viram lembretes"));
+        assertFalse(journal.contains("Notificações automáticas"));
+        controller.pause().stop().destroy();
     }
 
     @Test
