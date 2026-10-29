@@ -2698,7 +2698,7 @@ public final class MainActivity extends Activity {
                             post(() -> message("Análise por IA · " + result.model, result.display(request.labels)
                                     + "\n\nGerado por IA a partir dos dados enviados. São possibilidades, não um diagnóstico confirmado."));
                         } catch (Exception e) {
-                            post(() -> message("Análise por IA", error(e)));
+                            post(() -> message("Análise por IA", AnalysisClient.userMessage(e)));
                         }
                     }, "borbacar-ai").start();
                 }).show();
