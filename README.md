@@ -22,7 +22,7 @@
 
 [ci-shield]: https://github.com/YagoBorba/BorbaCarLabs/actions/workflows/android.yml/badge.svg?branch=develop
 [ci-link]: https://github.com/YagoBorba/BorbaCarLabs/actions/workflows/android.yml
-[release-shield]: https://img.shields.io/badge/Release-1.0.2-2EA44F?style=flat-square&labelColor=black
+[release-shield]: https://img.shields.io/badge/Release-1.1.0-2EA44F?style=flat-square&labelColor=black
 [release-link]: https://github.com/YagoBorba/BorbaCarLabs/releases
 [type-shield]: https://img.shields.io/badge/Project-Android%20App-0A66C2?style=flat-square&labelColor=black
 [type-link]: https://github.com/YagoBorba/BorbaCarLabs
