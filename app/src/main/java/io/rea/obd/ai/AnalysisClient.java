@@ -4,8 +4,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.HttpURLConnection;
+import java.net.NoRouteToHostException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -13,7 +17,32 @@ import org.json.JSONObject;
 public final class AnalysisClient {
     private static final int MAX_RESPONSE = 64 * 1024;
 
+    public static final class Failure extends IOException {
+        Failure(String message) {
+            super(message);
+        }
+    }
+
     private AnalysisClient() {
+    }
+
+    public static String userMessage(Exception exception) {
+        if (exception instanceof Failure || exception instanceof AnalysisResult.ContractException) {
+            return exception.getMessage();
+        }
+        if (exception instanceof SocketTimeoutException) {
+            return "O servidor de IA não respondeu a tempo. Tente novamente em instantes.";
+        }
+        if (exception instanceof ConnectException || exception instanceof NoRouteToHostException || exception instanceof UnknownHostException) {
+            return "Não foi possível alcançar o servidor de IA. Confira o endereço em Ajustes e se o celular está na mesma rede do servidor.";
+        }
+        if (exception instanceof JSONException) {
+            return "A resposta do servidor de IA não está no formato esperado.";
+        }
+        if (exception instanceof IOException) {
+            return "A comunicação com o servidor de IA foi interrompida. Tente novamente.";
+        }
+        return "Não foi possível concluir a análise por IA.";
     }
 
     public static JSONObject analyze(String serverUrl, String token, JSONObject request) throws IOException, JSONException {
@@ -32,7 +61,7 @@ public final class AnalysisClient {
             int status = connection.getResponseCode();
             String body = read(status < 400 ? connection.getInputStream() : connection.getErrorStream());
             if (status != 200) {
-                throw new IOException(failure(status, body));
+                throw new Failure(failure(status, body));
             }
             return new JSONObject(body);
         } finally {
@@ -69,7 +98,7 @@ public final class AnalysisClient {
             while ((read = stream.read(chunk)) != -1) {
                 buffer.write(chunk, 0, read);
                 if (buffer.size() > MAX_RESPONSE) {
-                    throw new IOException("Resposta do servidor de IA grande demais");
+                    throw new Failure("Resposta do servidor de IA grande demais.");
                 }
             }
             return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
