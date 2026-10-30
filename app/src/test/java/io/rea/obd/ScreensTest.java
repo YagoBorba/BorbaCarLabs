@@ -117,7 +117,71 @@ public class ScreensTest {
     }
 
     @Test
-    public void populatedScreensRender() throws Exception {
+    @Config(qualifiers = "pt-rBR-w360dp-h640dp-xhdpi")
+    public void todayShowsTheThreeSummariesOnASmallScreen() throws Exception {
+        seedVehicleAndJournal();
+        ActivityController<MainActivity> reader = Robolectric.buildActivity(MainActivity.class).setup();
+        reader.get().startDemo();
+        reader.get().navigate(NavigationState.DIAGNOSIS);
+        reader.get().scan();
+        waitForWorkers();
+        reader.pause().stop().destroy();
+
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        waitForWorkers();
+        capture(activity, "14-hoje-360x640");
+        View root = activity.getWindow().getDecorView();
+        String text = texts(root);
+        assertTrue(text.contains("Conectar adaptador"));
+        assertTrue(text.contains("código"));
+        for (String tag : new String[]{io.rea.obd.ui.HomeScreen.SUMMARY_READING, io.rea.obd.ui.HomeScreen.SUMMARY_SERVICE, io.rea.obd.ui.HomeScreen.SUMMARY_FUEL}) {
+            View summary = root.findViewWithTag(tag);
+            assertNotNull(tag, summary);
+            android.graphics.Rect visible = new android.graphics.Rect();
+            assertTrue(tag + " fora da tela", summary.getGlobalVisibleRect(visible));
+            assertTrue(tag + " cortado", visible.height() == summary.getHeight() && visible.width() == summary.getWidth());
+        }
+        controller.pause().stop().destroy();
+    }
+
+    @Test
+    @Config(qualifiers = "pt-rBR-w360dp-h640dp-xhdpi")
+    public void todaySummariesWrapWithLargeFonts() throws Exception {
+        seedVehicleAndJournal();
+        org.robolectric.RuntimeEnvironment.setFontScale(1.5f);
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        waitForWorkers();
+        capture(activity, "15-hoje-fonte-grande");
+        View root = activity.getWindow().getDecorView();
+        for (String tag : new String[]{io.rea.obd.ui.HomeScreen.SUMMARY_READING, io.rea.obd.ui.HomeScreen.SUMMARY_SERVICE, io.rea.obd.ui.HomeScreen.SUMMARY_FUEL}) {
+            View summary = root.findViewWithTag(tag);
+            assertNotNull(tag, summary);
+            assertFits(tag, summary);
+        }
+        controller.pause().stop().destroy();
+        org.robolectric.RuntimeEnvironment.setFontScale(1.0f);
+    }
+
+    private static void assertFits(String tag, View view) {
+        if (view instanceof android.widget.TextView) {
+            android.widget.TextView text = (android.widget.TextView) view;
+            assertNotNull(tag, text.getLayout());
+            for (int line = 0; line < text.getLineCount(); line++) {
+                assertTrue(tag + " corta \"" + text.getText() + "\"", text.getLayout().getLineWidth(line) <= text.getWidth() - text.getTotalPaddingLeft() - text.getTotalPaddingRight() + 1);
+            }
+            assertTrue(tag + " sem altura para \"" + text.getText() + "\"", text.getHeight() >= text.getLayout().getHeight());
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                assertFits(tag, group.getChildAt(i));
+            }
+        }
+    }
+
+    private static void seedVehicleAndJournal() throws Exception {
         android.content.Context context = org.robolectric.RuntimeEnvironment.getApplication();
         long now = System.currentTimeMillis();
         long day = 24L * 60 * 60 * 1000;
@@ -140,8 +204,12 @@ public class ScreensTest {
                 new java.math.BigDecimal("289.90"), null, false, false,
                 java.time.LocalDate.now().plusDays(45).toString(), new java.math.BigDecimal("56800")));
         journal.close();
-
         seed.pause().stop().destroy();
+    }
+
+    @Test
+    public void populatedScreensRender() throws Exception {
+        seedVehicleAndJournal();
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
         waitForWorkers();
