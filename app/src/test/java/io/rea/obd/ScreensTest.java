@@ -76,6 +76,37 @@ public class ScreensTest {
     }
 
     @Test
+    public void diagnosisShowsTheResultBeforeTheConnectionControls() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.DIAGNOSIS);
+        idle();
+        String before = texts(activity.getWindow().getDecorView());
+        assertTrue(before.indexOf("Iniciar leitura guiada") >= 0);
+        assertFalse(before.contains("Conexão e nova leitura"));
+
+        activity.scan();
+        waitForWorkers();
+        View root = activity.getWindow().getDecorView();
+        String after = texts(root);
+        int verdict = after.indexOf("códigos de falha encontrados");
+        int connection = after.indexOf("Conexão e nova leitura");
+        assertTrue(verdict >= 0);
+        assertTrue(connection > verdict);
+        assertTrue(after.indexOf("Iniciar leitura guiada") > connection);
+        View controls = root.findViewWithTag("disclosure-Conexão e nova leitura");
+        assertNotNull(controls);
+        android.view.ViewGroup parent = (android.view.ViewGroup) controls.getParent();
+        View content = parent.getChildAt(parent.indexOfChild(controls) + 1);
+        assertTrue(content.getVisibility() == View.GONE);
+        controls.performClick();
+        assertTrue(content.getVisibility() == View.VISIBLE);
+        capture(activity, "14-diagnostico-resultado-primeiro");
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void deniedBluetoothPermissionExplainsInsteadOfListingDevices() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();

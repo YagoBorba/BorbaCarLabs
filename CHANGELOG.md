@@ -4,6 +4,7 @@
 
 - Tela Hoje mais compacta: cartão do veículo com ilustração menor ao lado do nome e um resumo único com última leitura, próximo serviço e consumo, visíveis sem rolar em telas de 360x640 dp e legíveis com fonte grande.
 - App em português e inglês: novo item Idioma em Ajustes (Automático, Português ou English). Telas, diálogos, notificações de lembrete, relatórios TXT/PDF e catálogo de códigos traduzidos; números seguem o idioma (12,4 ou 12.4). A análise por IA responde no idioma escolhido. Casos salvos não mudam: a tradução acontece só na exibição.
+- Diagnóstico mostra o resultado primeiro: depois de uma leitura, veredito e códigos abrem a tela e os controles de conexão ficam recolhidos em "Conexão e nova leitura"; durante a leitura o layout anterior continua, com o progresso visível.
 
 ## 1.1.0 / Confiabilidade — 29/10/2026
 
