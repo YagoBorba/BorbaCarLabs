@@ -106,9 +106,13 @@ public final class UiKit {
     }
 
     public void artwork(LinearLayout linearLayout, int heightDp) {
+        artwork(linearLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(heightDp)));
+    }
+
+    public void artwork(LinearLayout linearLayout, LinearLayout.LayoutParams layoutParams) {
         VehicleArtwork artwork = new VehicleArtwork(this.context);
         artwork.setContentDescription(I18n.t("Ilustração genérica de um carro"));
-        linearLayout.addView(artwork, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(heightDp)));
+        linearLayout.addView(artwork, layoutParams);
     }
 
     public void section(LinearLayout linearLayout, String text, String text2) {
