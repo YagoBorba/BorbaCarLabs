@@ -831,9 +831,25 @@ public final class MainActivity extends Activity {
     private void diagnostics() {
         heading("SCANNER OBD", "Diagnóstico", activeVehicle() == null ? "Selecione um veículo na Garagem." : activeVehicle().name);
         UiKit uiKit = new UiKit(this);
-        LinearLayout feature = uiKit.feature(this.body);
-        uiKit.eyebrow(feature, this.demo ? "EXPERIÊNCIA DE DEMONSTRAÇÃO" : connected() ? "CONEXÃO ATIVA" : "COMECE POR UMA CONEXÃO");
-        uiKit.label(feature, (connected() || this.demo) ? "Scanner pronto" : "Conecte seu scanner", 23, this.TEXT, true);
+        DtcReadResult dtcReadResult = this.currentDtcRead;
+        if (dtcReadResult != null && !this.busy) {
+            readingResult(dtcReadResult);
+            LinearLayout connection = uiKit.disclosure(this.body, "Conexão e nova leitura");
+            label(connection, (connected() || this.demo) ? "Scanner pronto" : "Conecte seu scanner", 17, this.TEXT, true);
+            connectionControls(uiKit, connection);
+        } else {
+            LinearLayout feature = uiKit.feature(this.body);
+            uiKit.eyebrow(feature, this.demo ? "EXPERIÊNCIA DE DEMONSTRAÇÃO" : connected() ? "CONEXÃO ATIVA" : "COMECE POR UMA CONEXÃO");
+            uiKit.label(feature, (connected() || this.demo) ? "Scanner pronto" : "Conecte seu scanner", 23, this.TEXT, true);
+            connectionControls(uiKit, feature);
+            if (dtcReadResult != null) {
+                readingResult(dtcReadResult);
+            }
+        }
+        diagnosticsDetails(uiKit);
+    }
+
+    private void connectionControls(UiKit uiKit, LinearLayout feature) {
         uiKit.label(feature, this.status, 14, this.MUTED, false);
         if (!this.demo && !connected()) {
             uiKit.label(feature, "O app consulta o adaptador e a ECU. Não é necessário conhecer o protocolo do carro.", 14, this.MUTED, false);
@@ -856,34 +872,37 @@ public final class MainActivity extends Activity {
         if (!this.guidedStatus.isEmpty()) {
             DiagnosisScreen.progress(feature, this.guidedCompleted, this.guidedStatus);
         }
-        DtcReadResult dtcReadResult = this.currentDtcRead;
-        if (dtcReadResult != null) {
-            LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
-            if (this.currentDtcVehicle != null) {
-                button(verdict, "Investigar esta leitura", true, () -> {
-                    try {
-                        editCase(capturedCase(), true);
-                    } catch (Exception e) {
-                        message(error(e));
-                    }
-                }).setEnabled((this.caseBusy || this.busy) ? false : true);
-            }
-            for (final DtcObservation dtcObservation : dtcReadResult.observations()) {
-                LinearLayout card = card(this.body);
-                label(card, dtcObservation.code, 26, this.AMBER, true);
-                StringBuilder builder = new StringBuilder();
-                builder.append(DtcFormatter.category(dtcObservation.category));
-                builder.append(this.currentDtcRead.origin == DataOrigin.SIMULATED ? " · exemplo simulado" : "");
-                label(card, builder.toString(), 13, this.MUTED, false);
-                String structure = DtcStructure.describe(dtcObservation.code);
-                if (structure != null) {
-                    label(card, structure, 13, this.ACCENT, true);
+    }
+
+    private void readingResult(DtcReadResult dtcReadResult) {
+        LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
+        if (this.currentDtcVehicle != null) {
+            button(verdict, "Investigar esta leitura", true, () -> {
+                try {
+                    editCase(capturedCase(), true);
+                } catch (Exception e) {
+                    message(error(e));
                 }
-                DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
-                label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
-                button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
-            }
+            }).setEnabled((this.caseBusy || this.busy) ? false : true);
         }
+        for (final DtcObservation dtcObservation : dtcReadResult.observations()) {
+            LinearLayout card = card(this.body);
+            label(card, dtcObservation.code, 26, this.AMBER, true);
+            StringBuilder builder = new StringBuilder();
+            builder.append(DtcFormatter.category(dtcObservation.category));
+            builder.append(dtcReadResult.origin == DataOrigin.SIMULATED ? " · exemplo simulado" : "");
+            label(card, builder.toString(), 13, this.MUTED, false);
+            String structure = DtcStructure.describe(dtcObservation.code);
+            if (structure != null) {
+                label(card, structure, 13, this.ACCENT, true);
+            }
+            DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
+            label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
+            button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
+        }
+    }
+
+    private void diagnosticsDetails(UiKit uiKit) {
         if (this.currentSupplement != null) {
             LinearLayout card = card(this.body);
             label(card, this.currentSupplement.incomplete() ? "COMPLEMENTO INCOMPLETO" : "COMPLEMENTO COLETADO", 11, this.AMBER, true);
