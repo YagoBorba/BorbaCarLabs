@@ -342,7 +342,7 @@ public class ScreensTest {
         }
     }
 
-    private static void seedVehicleAndJournal() throws Exception {
+    static void seedVehicleAndJournal() throws Exception {
         android.content.Context context = org.robolectric.RuntimeEnvironment.getApplication();
         long now = System.currentTimeMillis();
         long day = 24L * 60 * 60 * 1000;
