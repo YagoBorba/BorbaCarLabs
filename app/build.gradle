@@ -46,6 +46,10 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
+            all {
+                systemProperty "screenshots.update", project.hasProperty("updateScreenshots")
+                inputs.dir "src/test/screenshots"
+            }
         }
     }
 
