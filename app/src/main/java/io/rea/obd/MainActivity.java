@@ -533,7 +533,7 @@ public final class MainActivity extends Activity {
     private void heading(String category, String text, String name) {
         UiKit uiKit = new UiKit(this);
         uiKit.eyebrow(this.body, category);
-        uiKit.label(this.body, text, 28, this.TEXT, true);
+        uiKit.title(this.body, text, 28);
         uiKit.label(this.body, name, 14, this.MUTED, false);
         gap(this.body, 12);
     }
@@ -572,16 +572,20 @@ public final class MainActivity extends Activity {
         }
         this.root.requestApplyInsets();
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation((getResources().getConfiguration().screenWidthDp < 360 || getResources().getConfiguration().fontScale > 1.3f) ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        boolean compactHeader = getResources().getConfiguration().screenWidthDp < 360 || getResources().getConfiguration().fontScale > 1.3f;
+        row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(22.0f), dp(16.0f), dp(22.0f), dp(12.0f));
+        row.setPadding(dp(22.0f), dp(compactHeader ? 8.0f : 16.0f), dp(22.0f), dp(compactHeader ? 4.0f : 12.0f));
         this.root.addView(row);
-        TextView label = text("BorbaCar Labs", 18, this.TEXT, true);
+        TextView label = text(compactHeader ? "" : "BorbaCar Labs", 18, this.TEXT, true);
         Drawable drawable = getDrawable(R.drawable.ic_brand);
         drawable.setBounds(0, 0, dp(30.0f), dp(30.0f));
         label.setCompoundDrawablesRelative(drawable, null, null, null);
-        label.setCompoundDrawablePadding(dp(10.0f));
-        row.addView(label, row.getOrientation() == LinearLayout.HORIZONTAL ? new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f) : new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        label.setCompoundDrawablePadding(dp(compactHeader ? 0.0f : 10.0f));
+        if (compactHeader) {
+            label.setContentDescription("BorbaCar Labs");
+        }
+        row.addView(label, compactHeader ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT) : new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
         if (this.demo) {
             text = "DEMONSTRAÇÃO";
         } else {
@@ -592,7 +596,14 @@ public final class MainActivity extends Activity {
         } else {
             i = connected() ? this.ACCENT : this.MUTED;
         }
-        row.addView(text(text, 11, i, true));
+        TextView connection = text(text, 11, i, true);
+        connection.setContentDescription(I18n.t(this.demo ? "Modo demonstração" : connected() ? "Conectado ao adaptador" : "Sem conexão com o adaptador"));
+        if (compactHeader) {
+            connection.setPadding(dp(12.0f), 0, 0, 0);
+            row.addView(connection, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        } else {
+            row.addView(connection);
+        }
         TextView ajustes = text("Ajustes", 13, this.ACCENT, true);
         ajustes.setMinHeight(dp(48.0f));
         ajustes.setGravity(Gravity.CENTER);
@@ -601,8 +612,12 @@ public final class MainActivity extends Activity {
         row.addView(ajustes);
         ajustes.setOnClickListener((view) -> navigate(3));
         if (this.demo) {
-            TextView label2 = text(this.page == 6 ? "MODO DEMONSTRAÇÃO · diário contém registros declarados" : "DADOS SIMULADOS · nenhum veículo está sendo consultado", 13, this.AMBER, true);
-            label2.setPadding(dp(22.0f), dp(4.0f), dp(22.0f), dp(10.0f));
+            String banner = this.page == 6 ? "MODO DEMONSTRAÇÃO · diário contém registros declarados" : "DADOS SIMULADOS · nenhum veículo está sendo consultado";
+            TextView label2 = text(compactHeader ? banner.substring(0, banner.indexOf(" · ")) : banner, 13, this.AMBER, true);
+            if (compactHeader) {
+                label2.setContentDescription(I18n.t(banner));
+            }
+            label2.setPadding(dp(22.0f), dp(compactHeader ? 0.0f : 4.0f), dp(22.0f), dp(compactHeader ? 6.0f : 10.0f));
             this.root.addView(label2);
         }
         if (this.recorder != null) {
@@ -655,7 +670,7 @@ public final class MainActivity extends Activity {
         this.nav = new LinearLayout(this);
         boolean stacked = getResources().getConfiguration().fontScale > 1.3f;
         this.nav.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        this.nav.setPadding(dp(12.0f), dp(10.0f), dp(12.0f), dp(10.0f));
+        this.nav.setPadding(dp(12.0f), dp(stacked ? 4.0f : 10.0f), dp(12.0f), dp(stacked ? 4.0f : 10.0f));
         this.nav.setBackgroundColor(this.CARD);
         this.root.addView(this.nav);
         String[] parts = {"Hoje", "Diagnóstico", "Histórico", "Garagem"};
@@ -670,7 +685,7 @@ public final class MainActivity extends Activity {
             }
             TextView label2 = text(parts[value4], value2, NavigationState.tab(this.page) == value4 ? this.ACCENT : this.MUTED, NavigationState.tab(this.page) == value4 ? focusable : false);
             label2.setGravity(Gravity.CENTER);
-            label2.setPadding(dp(2.0f), dp(10.0f), dp(2.0f), dp(10.0f));
+            label2.setPadding(dp(stacked ? 10.0f : 2.0f), dp(stacked ? 4.0f : 10.0f), dp(stacked ? 10.0f : 2.0f), dp(stacked ? 4.0f : 10.0f));
             label2.setBackground(ThemePalette.of(this).navigation(this, NavigationState.tab(this.page) == value4 ? focusable : false));
             Motion.press(label2);
             label2.setMinHeight(dp(48.0f));
@@ -680,7 +695,9 @@ public final class MainActivity extends Activity {
             Drawable mutate = getDrawable(values[value4]).mutate();
             mutate.setTint(NavigationState.tab(this.page) == value4 ? this.ACCENT : this.MUTED);
             mutate.setBounds(0, 0, dp(22.0f), dp(22.0f));
-            label2.setCompoundDrawables(null, mutate, null, null);
+            if (!stacked) {
+                label2.setCompoundDrawables(null, mutate, null, null);
+            }
             label2.setCompoundDrawablePadding(dp(4.0f));
             nav.addView(label2, new LinearLayout.LayoutParams(0, value, 1.0f));
             label2.setOnClickListener((view) -> navigate(NavigationState.route(tabIndex)));
@@ -1084,7 +1101,7 @@ public final class MainActivity extends Activity {
             row.setCompoundDrawablesRelative(null, null, null, null);
             row.setCompoundDrawablePadding(0);
             row.setTextSize(13.0f);
-            row.setPadding(dp(6.0f), dp(14.0f), dp(6.0f), dp(14.0f));
+            row.setPadding(dp(6.0f), dp(column.getOrientation() == LinearLayout.VERTICAL ? 6.0f : 14.0f), dp(6.0f), dp(column.getOrientation() == LinearLayout.VERTICAL ? 6.0f : 14.0f));
             row.setSelected(value == i);
             row.setTextColor(value == i ? this.ACCENT : this.MUTED);
             if (value == i) {

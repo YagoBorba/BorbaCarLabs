@@ -98,7 +98,7 @@ public final class DiagnosisScreen {
     private static TextView badge(UiKit ui, boolean clean) {
         TextView badge = new TextView(ui.context);
         badge.setText(clean ? "✓" : "!");
-        badge.setTextSize(22.0f);
+        badge.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 22.0f);
         badge.setGravity(Gravity.CENTER);
         badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         int tone = clean ? ui.palette.accent : ui.palette.attention;
