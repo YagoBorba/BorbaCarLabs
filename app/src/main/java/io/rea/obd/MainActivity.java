@@ -155,7 +155,7 @@ public final class MainActivity extends Activity {
     private TelemetryRecorder recorder;
     private TextView recordingBanner;
     private LinearLayout root;
-    private DataOrigin rpmHistoryOrigin;
+    private DataOrigin historyOrigin;
     private TextView scanView;
     private TextView statusView;
     private VehicleCatalogStore.Loaded vehicleCatalog;
@@ -192,7 +192,9 @@ public final class MainActivity extends Activity {
     private final Map<Integer, TextView> qualityViews = new HashMap();
     private final Map<Integer, TextView> valueViews = new HashMap();
     private final Map<Integer, TextView> extraViews = new HashMap();
-    private final List<ChartView.Point> rpmHistory = new ArrayList();
+    private final Map<Integer, List<ChartView.Point>> histories = new HashMap();
+    private final Map<Integer, Boolean> historyGaps = new HashMap();
+    private int expandedPid = 12;
     private String currentDtcAdapter = "";
     private final Map<Integer, DiagnosticCase.Sample> contextualSamples = new HashMap();
     private List<DiagnosticCase.Sample> currentCaseSamples = Collections.emptyList();
@@ -200,10 +202,9 @@ public final class MainActivity extends Activity {
     private List<JSONObject> caseDocuments = Collections.emptyList();
     private String caseWarning = "";
     private final SparseIntArray scrollPositions = new SparseIntArray();
-    private String rpmHistorySessionId = "";
+    private String historySessionId = "";
     private String recordingAcquisitionId = "";
-    private boolean rpmGap = true;
-    private final Set<Integer> selectedPids = new LinkedHashSet(Arrays.asList(12, 13, 5, 4, 17));
+    private final Set<Integer> selectedPids = new LinkedHashSet(Arrays.asList(12, 13, 5, 4, 17, 15));
     private boolean demo = false;
     private boolean busy = false;
     private boolean resumed = false;
@@ -781,7 +782,7 @@ public final class MainActivity extends Activity {
         File file = this.lastCsv;
         boolean enabled = file != null && file.exists();
         File lastCsv = this.lastCsv;
-        DashboardScreen.Views dashboardViews = DashboardScreen.render(linearLayout, activeVehicle, dashboardState, status, busy, enabled, lastCsv == null ? "" : lastCsv.getName(), new DashboardScreen.Actions() {
+        DashboardScreen.Views dashboardViews = DashboardScreen.render(linearLayout, activeVehicle, dashboardState, expandedPid(), status, busy, enabled, lastCsv == null ? "" : lastCsv.getName(), new DashboardScreen.Actions() {
             @Override
             public void connection() {
                 if (MainActivity.this.busy) {
@@ -804,6 +805,12 @@ public final class MainActivity extends Activity {
                 MainActivity.this.page = 2;
                 MainActivity.this.render();
                 MainActivity.this.schedulePoll(100L);
+            }
+
+            @Override
+            public void expand(int pid) {
+                MainActivity.this.expandedPid = pid;
+                MainActivity.this.render();
             }
 
             @Override
@@ -1168,7 +1175,7 @@ public final class MainActivity extends Activity {
                 MainActivity.this.currentSupplement = null;
                 MainActivity.this.currentCaseSamples = Collections.emptyList();
                 MainActivity.this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
-                MainActivity.this.clearRpmHistory();
+                MainActivity.this.clearHistories();
                 MainActivity.this.refreshHistory();
                 MainActivity.this.render();
             } catch (Exception e) {
@@ -1722,7 +1729,7 @@ public final class MainActivity extends Activity {
         this.ui.removeCallbacks(this.pollTask);
         this.samples.clear();
         this.contextualSamples.clear();
-        clearRpmHistory();
+        clearHistories();
         this.voltage = "—";
         this.voltageOrigin = null;
         this.currentDtcRead = null;
@@ -1769,6 +1776,12 @@ public final class MainActivity extends Activity {
                 map.put(5, Double.valueOf((Math.sin(((double) this.demoTick) * 0.05d) * 3.0d) + 88.0d));
                 map.put(4, Double.valueOf((10.0d * sin) + 32.0d));
                 map.put(17, Double.valueOf((sin * 6.0d) + 18.0d));
+                map.put(15, Double.valueOf((Math.sin(((double) this.demoTick) * 0.05d) * 2.0d) + 34.0d));
+                map.put(11, Double.valueOf((12.0d * sin) + 45.0d));
+                map.put(14, Double.valueOf((4.0d * sin) + 14.0d));
+                map.put(16, Double.valueOf((1.6d * sin) + 4.2d));
+                map.put(47, Double.valueOf(62.0d - (this.demoTick * 0.01d)));
+                map.put(66, Double.valueOf((0.1d * sin) + 14.1d));
                 for (Integer num : this.selectedPids) {
                     int intValue = num.intValue();
                     Double value = (Double) map.get(num);
@@ -1815,11 +1828,18 @@ public final class MainActivity extends Activity {
         }
     }
 
-    public void clearRpmHistory() {
-        this.rpmHistory.clear();
-        this.rpmHistoryOrigin = null;
-        this.rpmHistorySessionId = "";
-        this.rpmGap = true;
+    public void clearHistories() {
+        this.histories.clear();
+        this.historyGaps.clear();
+        this.historyOrigin = null;
+        this.historySessionId = "";
+    }
+
+    int expandedPid() {
+        if (this.selectedPids.contains(Integer.valueOf(this.expandedPid)) || this.selectedPids.isEmpty()) {
+            return this.expandedPid;
+        }
+        return this.selectedPids.iterator().next().intValue();
     }
 
     private void acceptSample(TelemetrySample telemetrySample) {
@@ -1829,22 +1849,18 @@ public final class MainActivity extends Activity {
         if (activeVehicle != null && this.acquisitionSessionId != null) {
             this.contextualSamples.put(Integer.valueOf(telemetrySample.pid), new DiagnosticCase.Sample(activeVehicle.id, this.acquisitionSessionId, telemetrySample));
         }
-        if (telemetrySample.pid == 12) {
-            if (telemetrySample.statusAt(this.clock.elapsedMillis(), DashboardState.MAX_AGE_MS) != TelemetrySample.Status.VALID) {
-                this.rpmGap = true;
-                return;
-            }
-            this.rpmHistory.add(new ChartView.Point(telemetrySample.epochMillis, telemetrySample.value.doubleValue(), this.rpmGap));
-            this.rpmGap = false;
-            this.rpmHistoryOrigin = telemetrySample.origin;
-            String acquisitionSessionId = this.acquisitionSessionId;
-            if (acquisitionSessionId == null) {
-                acquisitionSessionId = "";
-            }
-            this.rpmHistorySessionId = acquisitionSessionId;
-            if (this.rpmHistory.size() > 90) {
-                this.rpmHistory.remove(0);
-            }
+        Integer pid = Integer.valueOf(telemetrySample.pid);
+        if (telemetrySample.statusAt(this.clock.elapsedMillis(), DashboardState.MAX_AGE_MS) != TelemetrySample.Status.VALID || telemetrySample.value == null) {
+            this.historyGaps.put(pid, Boolean.TRUE);
+            return;
+        }
+        List<ChartView.Point> history = this.histories.computeIfAbsent(pid, (key) -> new ArrayList());
+        history.add(new ChartView.Point(telemetrySample.epochMillis, telemetrySample.value.doubleValue(), this.historyGaps.getOrDefault(pid, Boolean.TRUE).booleanValue()));
+        this.historyGaps.put(pid, Boolean.FALSE);
+        this.historyOrigin = telemetrySample.origin;
+        this.historySessionId = this.acquisitionSessionId == null ? "" : this.acquisitionSessionId;
+        if (history.size() > 90) {
+            history.remove(0);
         }
     }
 
@@ -1889,14 +1905,14 @@ public final class MainActivity extends Activity {
         }
         String text5 = text4;
         DashboardScreen.Views views = this.dashboardViews;
-        List<ChartView.Point> list = this.rpmHistory;
-        DataOrigin rpmHistoryOrigin = this.rpmHistoryOrigin;
-        if (rpmHistoryOrigin == null) {
+        List<ChartView.Point> list = this.histories.getOrDefault(Integer.valueOf(expandedPid()), Collections.emptyList());
+        DataOrigin historyOrigin = this.historyOrigin;
+        if (historyOrigin == null) {
             text3 = "origem não registrada";
         } else {
-            text3 = rpmHistoryOrigin == DataOrigin.SIMULATED ? "DADOS SIMULADOS" : "leituras OBD";
+            text3 = historyOrigin == DataOrigin.SIMULATED ? "DADOS SIMULADOS" : "leituras OBD";
         }
-        views.bind(dashboardState, list, text3, this.rpmHistorySessionId, flag ? this.voltage : "—", string, text5);
+        views.bind(dashboardState, list, text3, this.historySessionId, flag ? this.voltage : "—", string, text5);
     }
 
     private void connectionLost(ElmSession elmSession) {
@@ -2158,6 +2174,7 @@ public final class MainActivity extends Activity {
         }
         this.samples.clear();
         this.contextualSamples.clear();
+        clearHistories();
         this.selectedPids.clear();
         StringBuilder builder = new StringBuilder();
         for (int i2 = 0; i2 < booleans.length; i2++) {

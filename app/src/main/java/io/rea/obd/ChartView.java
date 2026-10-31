@@ -32,6 +32,7 @@ public final class ChartView extends View {
     private final Path trace;
     private int selected;
     private String unit;
+    private int decimals;
 
     public interface SelectionListener {
         void selected(Point point);
@@ -82,6 +83,14 @@ public final class ChartView extends View {
     }
 
     public void data(List<Point> list, String unit) {
+        data(list, unit, 0);
+    }
+
+    public String format(double value) {
+        return String.format(Locale.getDefault(), "%." + this.decimals + "f", Double.valueOf(value));
+    }
+
+    public void data(List<Point> list, String unit, int decimals) {
         SelectionListener selectionListener;
         Point selectedPoint = selectedPoint();
         ArrayList items = new ArrayList();
@@ -92,6 +101,7 @@ public final class ChartView extends View {
         }
         this.points = Collections.unmodifiableList(items);
         this.unit = unit;
+        this.decimals = Math.max(0, Math.min(3, decimals));
         this.selected = -1;
         if (selectedPoint != null) {
             for (int i = 0; i < this.points.size(); i++) {
@@ -130,7 +140,7 @@ public final class ChartView extends View {
 
     public String summary() {
         if (this.points.isEmpty()) {
-            return "Nenhuma captura de rotação nesta janela.";
+            return "Nenhuma captura nesta janela.";
         }
         double max = Double.NEGATIVE_INFINITY;
         double min = Double.POSITIVE_INFINITY;
@@ -143,7 +153,7 @@ public final class ChartView extends View {
                 i++;
             }
         }
-        return String.format(Locale.getDefault(), "%d capturas · mín %.0f · máx %.0f %s · %d lacunas", Integer.valueOf(this.points.size()), Double.valueOf(min), Double.valueOf(max), this.unit, Integer.valueOf(i)) + "\nEixo X: horário UTC de aquisição. Lacunas de resposta ou acima de 15 s não são conectadas.";
+        return this.points.size() + " capturas · mín " + format(min) + " · máx " + format(max) + " " + this.unit + " · " + i + " lacunas" + "\nEixo X: horário UTC de aquisição. Lacunas de resposta ou acima de 15 s não são conectadas.";
     }
 
     private long start() {
@@ -171,7 +181,7 @@ public final class ChartView extends View {
         while (it.hasNext()) {
             max = Math.max(max, Math.abs(it.next().value));
         }
-        return Math.min(getWidth() * 0.4f, this.paint.measureText(String.format(Locale.getDefault(), "%.0f", Double.valueOf(max))) + dp(10.0f));
+        return Math.min(getWidth() * 0.4f, this.paint.measureText(format(max)) + dp(10.0f));
     }
 
     private float x(Point point) {
@@ -209,8 +219,8 @@ public final class ChartView extends View {
             i++;
         }
         this.paint.setColor(this.palette.muted);
-        canvas.drawText(String.format(Locale.getDefault(), "%.0f", Double.valueOf(max)), 0.0f, sp(4.0f) + sp, this.paint);
-        canvas.drawText(String.format(Locale.getDefault(), "%.0f", Double.valueOf(min)), 0.0f, height, this.paint);
+        canvas.drawText(format(max), 0.0f, sp(4.0f) + sp, this.paint);
+        canvas.drawText(format(min), 0.0f, height, this.paint);
         String text = this.clock.format(start());
         String text2 = this.clock.format(end());
         canvas.drawText(text, 0.0f, getHeight() - dp(2.0f), this.paint);
@@ -264,7 +274,7 @@ public final class ChartView extends View {
             selectionListener.selected(selectedPoint);
         }
         if (selectedPoint != null) {
-            setContentDescription(I18n.t(io.rea.obd.ui.Format.when(selectedPoint.time) + " · " + String.format(Locale.getDefault(), "%.0f %s", Double.valueOf(selectedPoint.value), this.unit) + " · captura histórica " + (i + 1) + " de " + this.points.size()));
+            setContentDescription(I18n.t(io.rea.obd.ui.Format.when(selectedPoint.time) + " · " + format(selectedPoint.value) + " " + this.unit + " · captura histórica " + (i + 1) + " de " + this.points.size()));
         }
         invalidate();
     }

@@ -196,6 +196,47 @@ public class ScreensTest {
     }
 
     @Test
+    public void liveSummarizesSixSensorsAndExpandsOneWithItsChart() throws Exception {
+        ActivityController<MainActivity> seed = Robolectric.buildActivity(MainActivity.class).setup();
+        seed.get().getPreferences(0).edit().putString("selected_pids", "12,13,5,4,17,15").commit();
+        seed.pause().stop().destroy();
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.LIVE);
+        waitForWorkers();
+        capture(activity, "18-ao-vivo-resumo");
+        View root = activity.getWindow().getDecorView();
+        assertNotNull(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.SUMMARY));
+        for (int pid : new int[]{12, 13, 5, 4, 17, 15}) {
+            View tile = root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + pid);
+            assertNotNull("sensor " + pid, tile);
+            android.graphics.Rect visible = new android.graphics.Rect();
+            assertTrue("sensor " + pid + " fora da tela", tile.getGlobalVisibleRect(visible));
+            assertTrue("sensor " + pid + " cortado", visible.height() == tile.getHeight());
+            assertFalse("sensor " + pid + " sem valor", texts(tile).startsWith(io.rea.obd.SensorCatalog.get(pid).name + "\n—"));
+        }
+        assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 12)).contains("Simulado"));
+        assertTrue(texts(root).contains("DADOS SIMULADOS · nenhum veículo está sendo consultado"));
+        assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED)).startsWith("Rotação do motor"));
+
+        root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 13).performClick();
+        waitForWorkers();
+        root = activity.getWindow().getDecorView();
+        View expanded = root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED);
+        String details = texts(expanded);
+        assertTrue(details.startsWith("Velocidade"));
+        assertTrue(details.contains("km/h"));
+        assertTrue(details.contains("AMOSTRAS DA SESSÃO · DADOS SIMULADOS"));
+        assertTrue(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 13).isSelected());
+        assertFalse(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 12).isSelected());
+        io.rea.obd.ChartView chart = (io.rea.obd.ChartView) expanded.findViewWithTag("sensor-chart");
+        assertTrue(chart.pointCount() > 0);
+        assertTrue(chart.summary().endsWith("conectadas.") && chart.summary().contains("km/h"));
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void deniedBluetoothPermissionExplainsInsteadOfListingDevices() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
