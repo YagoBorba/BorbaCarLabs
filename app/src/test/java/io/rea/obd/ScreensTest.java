@@ -344,7 +344,7 @@ public class ScreensTest {
 
     static void seedVehicleAndJournal() throws Exception {
         android.content.Context context = org.robolectric.RuntimeEnvironment.getApplication();
-        long now = System.currentTimeMillis();
+        long now = io.rea.obd.ui.WallClock.millis();
         long day = 24L * 60 * 60 * 1000;
         io.rea.obd.vehicle.VehicleProfile cobalt = new io.rea.obd.vehicle.VehicleProfile("car-1", "Meu Cobalt",
                 "Chevrolet", "Cobalt", 2019, "BR", "LTZ", "1.8 L · 8V", "Flex", "Automático · 6 marchas", "");
@@ -363,7 +363,7 @@ public class ScreensTest {
         journal.save(new io.rea.obd.journal.JournalEntry("s1", "car-1", "Meu Cobalt", io.rea.obd.journal.JournalEntry.Kind.SERVICE, 1,
                 now - 30 * day, now - 30 * day, now - 30 * day, "Troca de óleo e filtro", km.subtract(new java.math.BigDecimal("1200")), null,
                 new java.math.BigDecimal("289.90"), null, false, false,
-                java.time.LocalDate.now().plusDays(45).toString(), new java.math.BigDecimal("56800")));
+                io.rea.obd.ui.WallClock.today().plusDays(45).toString(), new java.math.BigDecimal("56800")));
         journal.close();
         seed.pause().stop().destroy();
     }
