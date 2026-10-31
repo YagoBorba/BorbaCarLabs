@@ -161,7 +161,7 @@ public final class JournalController {
     public void render(LinearLayout linearLayout) {
         UiKit uiKit = new UiKit(this.activity);
         final VehicleProfile vehicle = this.host.vehicle();
-        uiKit.label(linearLayout, "Diário do carro", 22, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        uiKit.title(linearLayout, "Diário do carro", 22).setPadding(0, 0, 0, uiKit.dp(2));
         uiKit.label(linearLayout, vehicle == null ? "Escolha um perfil na Garagem para registrar acontecimentos." : vehicle.name + " · informações declaradas por você", 13, UiKit.MUTED, false);
         if (!this.warning.isEmpty()) {
             uiKit.label(linearLayout, this.warning, 14, UiKit.AMBER, false);
