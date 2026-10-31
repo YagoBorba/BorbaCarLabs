@@ -43,7 +43,7 @@ import org.robolectric.annotation.GraphicsMode;
 public class EnglishScreensTest {
     private static final File OUT = new File("build/screenshots/en");
     private static final Pattern PORTUGUESE = Pattern.compile(
-            "[ãõçáéíóúâêôÃÕÇÁÉÍÓÚÂÊÔ]|\\b(de|da|dos|das|não|com|para|em|uma|um|sem|seu|sua|você|leitura|leituras|veículo|registro|registros|consulta|hoje|ontem|consumo|gasolina|etanol|cidade|estrada|dias|sensores|ajustes|garagem|sintomas|tanque|cheio|abastecimentos|simulado|acompanhamento|ligados|desligados|salvar|voltar|continuar|cancelar|fechar|remover|apagar|enviar)\\b",
+            "[ãõçáéíóúâêôÃÕÇÁÉÍÓÚÂÊÔ]|\\b(de|da|dos|das|não|com|para|em|uma|um|sem|seu|sua|você|leitura|leituras|veículo|registro|registros|consulta|hoje|ontem|consumo|gasolina|etanol|cidade|estrada|dias|sensores|ajustes|garagem|sintomas|tanque|cheio|abastecimentos|simulado|acompanhamento|ligados|desligados|salvar|voltar|continuar|cancelar|fechar|remover|apagar|enviar|falha|falhas|indicada|indicadas|simulador)\\b",
             Pattern.CASE_INSENSITIVE);
 
     private final Set<String> untranslated = new LinkedHashSet<>();
@@ -80,7 +80,10 @@ public class EnglishScreensTest {
 
     private void check(MainActivity activity, String name) throws IOException {
         idle();
-        View root = activity.getWindow().getDecorView();
+        check(activity.getWindow().getDecorView(), name);
+    }
+
+    private void check(View root, String name) throws IOException {
         List<String> found = new ArrayList<>();
         texts(root, found);
         for (String text : found) {
@@ -141,6 +144,15 @@ public class EnglishScreensTest {
         activity.scan();
         waitForWorkers();
         check(activity, "07-diagnosis");
+        activity.getWindow().getDecorView().findViewWithTag("action-understand").performClick();
+        idle();
+        android.app.AlertDialog explanation = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        check(explanation.getWindow().getDecorView(), "07a-understand-reading");
+        explanation.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).performClick();
+        idle();
+        android.app.AlertDialog summary = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        check(summary.getWindow().getDecorView(), "07b-workshop-summary");
+        summary.dismiss();
         activity.navigate(NavigationState.LIVE);
         waitForWorkers();
         check(activity, "08-live");
