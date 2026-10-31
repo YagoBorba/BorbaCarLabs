@@ -47,6 +47,7 @@ import io.rea.obd.diagnostics.DtcDemoScenario;
 import io.rea.obd.diagnostics.DtcFormatter;
 import io.rea.obd.diagnostics.DtcObservation;
 import io.rea.obd.diagnostics.DtcReadResult;
+import io.rea.obd.diagnostics.ReadingGuide;
 import io.rea.obd.diagnostics.SupplementalDemoScenario;
 import io.rea.obd.diagnostics.SupplementalFormatter;
 import io.rea.obd.diagnostics.SupplementalReadResult;
@@ -876,8 +877,13 @@ public final class MainActivity extends Activity {
 
     private void readingResult(DtcReadResult dtcReadResult) {
         LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
+        boolean hasCodes = !dtcReadResult.observations().isEmpty();
+        if (hasCodes) {
+            button(verdict, "Entender esta leitura", true, () -> understandReading(dtcReadResult)).setTag("action-understand");
+            button(verdict, "Preparar resumo para oficina", false, () -> workshopSummary(dtcReadResult)).setTag("action-workshop");
+        }
         if (this.currentDtcVehicle != null) {
-            button(verdict, "Investigar esta leitura", true, () -> {
+            button(verdict, "Investigar esta leitura", !hasCodes, () -> {
                 try {
                     editCase(capturedCase(), true);
                 } catch (Exception e) {
@@ -899,6 +905,45 @@ public final class MainActivity extends Activity {
             DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
             label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
             button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
+        }
+    }
+
+    void understandReading(DtcReadResult dtcReadResult) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18.0f), dp(10.0f), dp(18.0f), dp(16.0f));
+        DiagnosisScreen.explanation(content, dtcReadResult, this::showDtcDefinition);
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setBackgroundColor(this.CARD);
+        scrollView.addView(content);
+        new LocalizedDialog(this).setTitle("Entender esta leitura").setView(scrollView).setNeutralButton("Resumo para oficina", (dialog, which) -> workshopSummary(dtcReadResult)).setPositiveButton("Fechar", null).show();
+    }
+
+    void workshopSummary(DtcReadResult dtcReadResult) {
+        String vehicle = this.currentDtcVehicle == null ? "" : this.currentDtcVehicle.name + " · " + this.currentDtcVehicle.description();
+        String adapter = this.currentDtcAdapter;
+        final List<String> lines = ReportText.readable(ReadingGuide.workshopSummary(dtcReadResult, vehicle, adapter, dtcReadResult == this.currentDtcRead ? this.currentSupplement : null), java.time.ZoneId.systemDefault());
+        final String text = String.join("\n", lines);
+        new LocalizedDialog(this).setTitle("Resumo para oficina").setMessage(text).setPositiveButton("Compartilhar", (dialog, which) -> shareWorkshopSummary(text)).setNeutralButton("Salvar PDF", (dialog, which) -> saveWorkshopPdf(lines)).setNegativeButton("Fechar", null).show();
+    }
+
+    private void shareWorkshopSummary(String text) {
+        Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, I18n.t("Resumo para oficina · BorbaCar Labs")).putExtra(Intent.EXTRA_TEXT, text);
+        startActivity(Intent.createChooser(send, I18n.t("Compartilhar resumo")));
+    }
+
+    private void saveWorkshopPdf(List<String> lines) {
+        try {
+            File file = new File(getCacheDir(), "resumo-oficina.pdf");
+            ReportWriter.pdf(file, lines);
+            this.pendingPdf = file;
+            Intent intent = new Intent("android.intent.action.CREATE_DOCUMENT");
+            intent.addCategory("android.intent.category.OPENABLE");
+            intent.setType("application/pdf");
+            intent.putExtra("android.intent.extra.TITLE", "resumo-oficina.pdf");
+            startActivityForResult(intent, 500);
+        } catch (Exception e) {
+            message(error(e));
         }
     }
 

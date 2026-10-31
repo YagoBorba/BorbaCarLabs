@@ -107,6 +107,57 @@ public class ScreensTest {
     }
 
     @Test
+    public void readingWithCodesOffersToUnderstandItAndPrepareAWorkshopSummary() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.DIAGNOSIS);
+        activity.scan();
+        waitForWorkers();
+        View root = activity.getWindow().getDecorView();
+        View understand = root.findViewWithTag("action-understand");
+        View workshop = root.findViewWithTag("action-workshop");
+        for (View action : new View[]{understand, workshop}) {
+            assertNotNull(action);
+            android.graphics.Rect visible = new android.graphics.Rect();
+            assertTrue(action.getGlobalVisibleRect(visible));
+            assertTrue(visible.height() == action.getHeight());
+        }
+        capture(activity, "16-diagnostico-proximos-passos");
+
+        understand.performClick();
+        idle();
+        android.app.AlertDialog explanation = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        assertTrue(explanation.isShowing());
+        View dialogRoot = explanation.getWindow().getDecorView();
+        assertNotNull(dialogRoot.findViewWithTag("explanation-P0133"));
+        assertNotNull(dialogRoot.findViewWithTag("explanation-P0301"));
+        String explained = texts(dialogRoot);
+        assertTrue(explained.contains("Falha de combustão indicada no cilindro 1."));
+        assertTrue(explained.contains("Pendente (serviço 07)"));
+        assertTrue(explained.contains("PRÓXIMOS PASSOS"));
+        explanation.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).performClick();
+        idle();
+
+        android.app.AlertDialog summary = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        assertTrue(summary != explanation && summary.isShowing());
+        String message = shadowOf(summary).getMessage().toString();
+        assertTrue(message.startsWith("Resumo para oficina · BorbaCar Labs"));
+        assertTrue(message.contains("P0133 · Armazenado"));
+        assertTrue(message.contains("P0301 · Pendente"));
+        assertTrue(message.contains("sem internet"));
+        assertTrue("Salvar PDF".contentEquals(summary.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).getText()));
+        summary.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();
+        idle();
+        android.content.Intent chooser = shadowOf(activity).getNextStartedActivity();
+        assertNotNull(chooser);
+        android.content.Intent send = chooser.getParcelableExtra(android.content.Intent.EXTRA_INTENT);
+        assertTrue(android.content.Intent.ACTION_SEND.equals(send.getAction()));
+        assertTrue(send.getStringExtra(android.content.Intent.EXTRA_TEXT).equals(message));
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void deniedBluetoothPermissionExplainsInsteadOfListingDevices() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
