@@ -128,18 +128,36 @@ public final class HomeScreen {
             tight(ui, ui.label(item, "sem lembrete registrado", 12, UiKit.MUTED, false));
             return;
         }
-        if (!reminder.dueDate.isEmpty()) {
-            LocalDate due = LocalDate.parse(reminder.dueDate);
-            long days = ChronoUnit.DAYS.between(LocalDate.now(), due);
-            tight(ui, ui.label(item, due.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), 17, days < 0 ? UiKit.AMBER : UiKit.TEXT, true));
-            String detail = days < 0 ? "vencido há " + Format.count((int) -days, "dia", "dias") : days == 0 ? "vence hoje" : "em " + Format.count((int) days, "dia", "dias");
-            if (reminder.dueOdometer != null) {
-                detail = detail + " · ou " + Format.km(reminder.dueOdometer);
-            }
-            tight(ui, ui.label(item, detail, 12, days < 0 ? UiKit.AMBER : UiKit.MUTED, false));
-        } else if (reminder.dueOdometer != null) {
-            tight(ui, ui.label(item, Format.km(reminder.dueOdometer), 17, UiKit.TEXT, true));
+        Due due = due(reminder);
+        tight(ui, ui.label(item, due.value, 17, due.overdue ? UiKit.AMBER : UiKit.TEXT, true));
+        if (!due.detail.isEmpty()) {
+            tight(ui, ui.label(item, due.detail, 12, due.overdue ? UiKit.AMBER : UiKit.MUTED, false));
         }
+    }
+
+    static final class Due {
+        final String value;
+        final String detail;
+        final boolean overdue;
+
+        Due(String value, String detail, boolean overdue) {
+            this.value = value;
+            this.detail = detail;
+            this.overdue = overdue;
+        }
+    }
+
+    static Due due(JournalEntry reminder) {
+        if (reminder.dueDate.isEmpty()) {
+            return new Due(reminder.dueOdometer == null ? "—" : Format.km(reminder.dueOdometer), "", false);
+        }
+        LocalDate due = LocalDate.parse(reminder.dueDate);
+        long days = ChronoUnit.DAYS.between(LocalDate.now(), due);
+        String detail = days < 0 ? "vencido há " + Format.count((int) -days, "dia", "dias") : days == 0 ? "vence hoje" : "em " + Format.count((int) days, "dia", "dias");
+        if (reminder.dueOdometer != null) {
+            detail = detail + " · ou " + Format.km(reminder.dueOdometer);
+        }
+        return new Due(due.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), detail, days < 0);
     }
 
     private static void fuel(UiKit ui, LinearLayout card, JournalController.Glance glance, VehicleEfficiency.Official official) {
