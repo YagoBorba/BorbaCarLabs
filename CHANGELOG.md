@@ -6,6 +6,7 @@
 - App em português e inglês: novo item Idioma em Ajustes (Automático, Português ou English). Telas, diálogos, notificações de lembrete, relatórios TXT/PDF e catálogo de códigos traduzidos; números seguem o idioma (12,4 ou 12.4). A análise por IA responde no idioma escolhido. Casos salvos não mudam: a tradução acontece só na exibição.
 - Diagnóstico mostra o resultado primeiro: depois de uma leitura, veredito e códigos abrem a tela e os controles de conexão ficam recolhidos em "Conexão e nova leitura"; durante a leitura o layout anterior continua, com o progresso visível.
 - Próximo passo depois de uma leitura com códigos: "Entender esta leitura" explica cada código com o significado, o serviço que o informou (armazenado, pendente ou permanente), a luz de injeção e os limites da leitura; "Preparar resumo para oficina" monta um texto com veículo, códigos, consultas e complemento coletado para compartilhar ou salvar em PDF. Tudo funciona sem internet. O PDF de relatórios deixa de mostrar "falha indicada" em português com o app em inglês.
+- Diário mais compacto: resumo no topo com consumo, próximo serviço e último registro lado a lado; "Novo registro" e o filtro na mesma linha; cartões de registro menores, tocáveis por inteiro, com data, quilometragem e valor numa linha. A explicação do consumo, o total de custos e como funcionam os lembretes ficam em seções recolhidas. Os primeiros registros aparecem sem rolar.
 
 ## 1.1.0 / Confiabilidade — 29/10/2026
 

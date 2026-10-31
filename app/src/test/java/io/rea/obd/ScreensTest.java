@@ -158,6 +158,44 @@ public class ScreensTest {
     }
 
     @Test
+    public void journalShowsTheSummaryAndEntriesOnTheFirstScreen() throws Exception {
+        seedVehicleAndJournal();
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        waitForWorkers();
+        activity.startDemo();
+        activity.navigate(NavigationState.JOURNAL);
+        waitForWorkers();
+        capture(activity, "17-diario-compacto");
+        View root = activity.getWindow().getDecorView();
+        View summary = root.findViewWithTag(io.rea.obd.ui.JournalController.SUMMARY);
+        assertNotNull(summary);
+        String facts = texts(summary);
+        assertTrue(facts.contains("12,47 km/L"));
+        assertTrue(facts.contains("PRÓXIMO SERVIÇO"));
+        assertTrue(facts.contains("Troca de óleo e filtro"));
+        assertTrue(facts.contains("ÚLTIMO REGISTRO"));
+        View first = root.findViewWithTag(io.rea.obd.ui.JournalController.FIRST_ENTRY);
+        assertNotNull(first);
+        android.graphics.Rect visible = new android.graphics.Rect();
+        assertTrue(first.getGlobalVisibleRect(visible));
+        assertTrue("primeiro registro cortado", visible.height() == first.getHeight());
+        assertTrue(texts(first).contains("Abastecimento"));
+
+        View calculations = root.findViewWithTag("disclosure-Consumo, custos e lembretes");
+        assertNotNull(calculations);
+        android.view.ViewGroup parent = (android.view.ViewGroup) calculations.getParent();
+        View content = parent.getChildAt(parent.indexOfChild(calculations) + 1);
+        assertTrue(content.getVisibility() == View.GONE);
+        assertTrue(texts(content).contains("Total informado: R$ 746,40"));
+
+        first.performClick();
+        idle();
+        assertTrue(org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().isShowing());
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void deniedBluetoothPermissionExplainsInsteadOfListingDevices() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();

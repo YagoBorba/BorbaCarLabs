@@ -8,8 +8,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
 import io.rea.obd.journal.FuelSummary;
 import io.rea.obd.journal.JournalEntry;
 import io.rea.obd.journal.JournalJson;
@@ -40,6 +46,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class JournalController {
+    public static final String SUMMARY = "journal-summary";
+    public static final String FIRST_ENTRY = "journal-first-entry";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor((runnable) -> {
         Thread thread = new Thread(runnable, "journal-storage");
         thread.setDaemon(true);
@@ -152,93 +160,68 @@ public final class JournalController {
 
     public void render(LinearLayout linearLayout) {
         UiKit uiKit = new UiKit(this.activity);
-        uiKit.eyebrow(linearLayout, "ACOMPANHAMENTO DO VEÍCULO");
-        uiKit.label(linearLayout, "Diário do carro", 28, UiKit.TEXT, true);
         final VehicleProfile vehicle = this.host.vehicle();
-        uiKit.label(linearLayout, vehicle == null ? "Escolha um perfil na Garagem para registrar acontecimentos." : vehicle.name + " · informações declaradas por você", 15, UiKit.MUTED, false);
+        uiKit.label(linearLayout, "Diário do carro", 22, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        uiKit.label(linearLayout, vehicle == null ? "Escolha um perfil na Garagem para registrar acontecimentos." : vehicle.name + " · informações declaradas por você", 13, UiKit.MUTED, false);
         if (!this.warning.isEmpty()) {
             uiKit.label(linearLayout, this.warning, 14, UiKit.AMBER, false);
         }
         if (!this.ready) {
             if (this.warning.isEmpty()) {
                 uiKit.label(linearLayout, "Carregando seus registros…", 14, UiKit.MUTED, false);
-                return;
             }
             return;
         }
-        LinearLayout column = uiKit.column();
-        linearLayout.addView(column);
-        uiKit.button(column, "Novo registro", true, () -> new LocalizedDialog(this.activity).setTitle("O que você quer registrar?").setItems(new String[]{"Sintoma", "Serviço", "Abastecimento"}, (dialog, which) -> open(JournalEntry.Kind.values()[which], null, null)).setNegativeButton("Cancelar", null).show()).setEnabled((vehicle == null || this.host.demo() || this.saving) ? false : true);
-        if (this.host.demo()) {
-            uiKit.label(column, "Encerre a demonstração para registrar acontecimentos reais informados por você.", 13, UiKit.AMBER, false);
-        }
         if (vehicle != null) {
-            final FuelSummary latest = FuelSummary.latest(this.entries, vehicle.id);
-            LinearLayout card = uiKit.card(linearLayout, false);
-            uiKit.eyebrow(card, "CONSUMO POR ABASTECIMENTOS");
-            uiKit.label(card, latest.kmPerLiter == null ? "Aguardando um intervalo completo" : Format.decimal(latest.kmPerLiter) + " km/L", 24, UiKit.TEXT, true);
-            uiKit.label(card, latest.explanation, 13, UiKit.MUTED, false);
-            if (latest.kmPerLiter != null) {
-                uiKit.button(card, "Como foi calculado", false, () -> message("Distância: " + latest.distance + " km\nVolume: " + latest.liters + " L\n" + latest.explanation + "\nEntradas e revisões: " + String.join(", ", latest.entryRevisions)));
-            }
-            BigDecimal bigDecimal = BigDecimal.ZERO;
-            int i = 0;
-            for (JournalEntry journalEntry : this.entries) {
-                if (journalEntry.vehicleId.equals(vehicle.id) && !journalEntry.voided && journalEntry.cost != null) {
-                    bigDecimal = bigDecimal.add(journalEntry.cost);
-                    i++;
-                }
-            }
-            uiKit.label(linearLayout, i == 0 ? "Custos ainda não informados." : "Total informado: " + Format.money(bigDecimal) + " · " + Format.count(i, "registro com valor", "registros com valor"), 14, UiKit.MUTED, false);
+            summary(uiKit, linearLayout, vehicle);
         }
         final String[] parts = {"Todos", "Sintomas", "Serviços", "Abastecimentos"};
-        uiKit.button(linearLayout, "Filtrar: " + parts[this.filter], false, () -> {
+        boolean sideBySide = this.activity.getResources().getConfiguration().fontScale <= 1.3f && this.activity.getResources().getConfiguration().screenWidthDp >= 340;
+        LinearLayout actions = uiKit.column();
+        actions.setOrientation(sideBySide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        linearLayout.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        Button add = uiKit.button(actions, "Novo registro", true, () -> new LocalizedDialog(this.activity).setTitle("O que você quer registrar?").setItems(new String[]{"Sintoma", "Serviço", "Abastecimento"}, (dialog, which) -> open(JournalEntry.Kind.values()[which], null, null)).setNegativeButton("Cancelar", null).show());
+        add.setEnabled((vehicle == null || this.host.demo() || this.saving) ? false : true);
+        Button filter = uiKit.button(actions, "Filtrar: " + parts[this.filter], false, () -> {
             new LocalizedDialog(this.activity).setTitle("Mostrar registros").setItems(parts, (dialog, which) -> {
                 this.filter = which;
                 this.limit = 20;
                 this.host.changed();
             }).setNegativeButton("Cancelar", null).show();
         });
-        int value = 0;
-        int value2 = 0;
+        if (sideBySide) {
+            LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            first.setMargins(0, 0, uiKit.dp(8), uiKit.dp(12));
+            add.setLayoutParams(first);
+            LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            second.bottomMargin = uiKit.dp(12);
+            filter.setLayoutParams(second);
+        }
+        if (this.host.demo()) {
+            uiKit.label(linearLayout, "Encerre a demonstração para registrar acontecimentos reais informados por você.", 13, UiKit.AMBER, false);
+        }
+        int shown = 0;
+        int matching = 0;
         for (final JournalEntry entry : this.entries) {
             if (vehicle != null && entry.vehicleId.equals(vehicle.id) && (this.filter == 0 || entry.kind.ordinal() == this.filter - 1)) {
-                value2++;
-                if (value < this.limit) {
-                    int value3 = value + 1;
-                    LinearLayout card = uiKit.card(linearLayout, false);
-                    StringBuilder builder = new StringBuilder();
-                    builder.append(entry.title());
-                    builder.append(entry.voided ? " · ANULADO" : "");
-                    uiKit.eyebrow(card, builder.toString());
-                    uiKit.label(card, local(entry.occurredAt), 14, UiKit.MUTED, false);
-                    uiKit.label(card, entry.note.isEmpty() ? "Abastecimento registrado" : entry.note, 17, UiKit.TEXT, true);
-                    StringBuilder builder2 = new StringBuilder("Informado por você · revisão ");
-                    builder2.append(entry.revision);
-                    builder2.append(entry.odometer != null ? " · " + entry.odometer + " km" : "");
-                    uiKit.label(card, builder2.toString(), 12, UiKit.MUTED, false);
-                    if (!entry.dueDate.isEmpty()) {
-                        StringBuilder builder3 = new StringBuilder();
-                        builder3.append(entry.voided ? "Data do registro anulado: " : "Próxima data informada: ");
-                        builder3.append(entry.dueDate);
-                        uiKit.label(card, builder3.toString(), 13, UiKit.MUTED, false);
-                    }
-                    if (entry.dueOdometer != null) {
-                        uiKit.label(card, "Próximo hodômetro informado: " + entry.dueOdometer + " km", 13, UiKit.MUTED, false);
-                    }
-                    uiKit.button(card, "Ver registro", false, () -> this.detail(entry));
-                    value = value3;
+                matching++;
+                if (shown < this.limit) {
+                    entry(uiKit, linearLayout, entry, shown == 0);
+                    shown++;
                 }
             }
         }
-        if (value2 == 0) {
+        if (matching == 0) {
             uiKit.label(linearLayout, "Nenhum registro neste filtro. Comece pelo que você percebeu ou fez no carro.", 15, UiKit.MUTED, false);
         }
-        if (value2 > this.limit) {
+        if (matching > this.limit) {
             uiKit.button(linearLayout, "Mostrar mais registros", false, () -> {
                 this.limit += 20;
                 this.host.changed();
             });
+        }
+        if (vehicle != null) {
+            calculations(uiKit, uiKit.disclosure(linearLayout, "Consumo, custos e lembretes"), vehicle);
         }
         LinearLayout disclosure = uiKit.disclosure(linearLayout, "Opções do diário");
         uiKit.button(disclosure, "Exportar diário deste veículo", false, () -> this.exportVehicle(vehicle)).setEnabled((vehicle == null || !this.entries.stream().anyMatch((obj) -> ((JournalEntry) obj).vehicleId.equals(vehicle.id)) || this.saving) ? false : true);
@@ -246,8 +229,113 @@ public final class JournalController {
         uiKit.label(disclosure, "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Restaurar backup ainda não faz parte deste diário.", 12, UiKit.MUTED, false);
     }
 
+    private void summary(UiKit uiKit, LinearLayout linearLayout, VehicleProfile vehicle) {
+        FuelSummary fuel = FuelSummary.latest(this.entries, vehicle.id);
+        JournalEntry reminder = MaintenanceReminders.next(this.entries, vehicle.id);
+        JournalEntry last = null;
+        for (JournalEntry entry : this.entries) {
+            if (entry.vehicleId.equals(vehicle.id) && !entry.voided && (last == null || entry.occurredAt > last.occurredAt)) {
+                last = entry;
+            }
+        }
+        LinearLayout card = uiKit.card(linearLayout, false);
+        card.setTag(SUMMARY);
+        card.setPadding(uiKit.dp(14), uiKit.dp(12), uiKit.dp(14), uiKit.dp(8));
+        ((LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = uiKit.dp(12);
+        boolean columns = this.activity.getResources().getConfiguration().fontScale <= 1.3f && this.activity.getResources().getConfiguration().screenWidthDp >= 340;
+        card.setOrientation(columns ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        fact(uiKit, card, columns, "CONSUMO", fuel.kmPerLiter == null ? "—" : Format.decimal(fuel.kmPerLiter) + " km/L", fuel.kmPerLiter == null ? "aguardando um intervalo completo" : "último tanque cheio a cheio", false);
+        if (reminder == null) {
+            fact(uiKit, card, columns, "PRÓXIMO SERVIÇO", "—", "sem lembrete registrado", false);
+        } else {
+            HomeScreen.Due due = HomeScreen.due(reminder);
+            fact(uiKit, card, columns, "PRÓXIMO SERVIÇO", due.value, reminder.note.isEmpty() ? due.detail : reminder.note, due.overdue);
+        }
+        fact(uiKit, card, columns, "ÚLTIMO REGISTRO", last == null ? "—" : local(last.occurredAt).substring(0, 10), last == null ? "nenhum registro ainda" : last.title(), false);
+    }
+
+    private static void fact(UiKit uiKit, LinearLayout card, boolean columns, String title, String value, String detail, boolean attention) {
+        LinearLayout item = uiKit.column();
+        if (columns) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            if (card.getChildCount() > 0) {
+                params.setMarginStart(uiKit.dp(10));
+            }
+            card.addView(item, params);
+        } else {
+            card.addView(item, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        uiKit.label(item, title, 10, UiKit.ACCENT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        uiKit.label(item, value, 15, attention ? UiKit.AMBER : UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        TextView small = uiKit.label(item, detail, 11, attention ? UiKit.AMBER : UiKit.MUTED, false);
+        small.setPadding(0, 0, 0, uiKit.dp(columns ? 4 : 8));
+        small.setMaxLines(columns ? 2 : 3);
+        small.setEllipsize(TextUtils.TruncateAt.END);
+    }
+
+    private void entry(UiKit uiKit, LinearLayout linearLayout, final JournalEntry entry, boolean first) {
+        LinearLayout card = uiKit.card(linearLayout, false);
+        card.setPadding(uiKit.dp(16), uiKit.dp(12), uiKit.dp(16), uiKit.dp(8));
+        ((LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = uiKit.dp(10);
+        if (first) {
+            card.setTag(FIRST_ENTRY);
+        }
+        StringBuilder title = new StringBuilder(entry.title());
+        title.append(entry.voided ? " · ANULADO" : "");
+        uiKit.eyebrow(card, title.toString());
+        uiKit.label(card, entry.note.isEmpty() ? "Abastecimento registrado" : entry.note, 16, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(4));
+        StringBuilder meta = new StringBuilder(local(entry.occurredAt));
+        meta.append(entry.odometer != null ? " · " + Format.km(entry.odometer) : "");
+        meta.append(entry.cost != null ? " · " + Format.money(entry.cost) : "");
+        uiKit.label(card, meta.toString(), 12, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+        if (!entry.dueDate.isEmpty()) {
+            uiKit.label(card, (entry.voided ? "Data do registro anulado: " : "Próxima data informada: ") + day(entry.dueDate), 12, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+        }
+        if (entry.dueOdometer != null) {
+            uiKit.label(card, "Próximo hodômetro informado: " + Format.km(entry.dueOdometer), 12, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+        }
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setMinimumHeight(uiKit.dp(48));
+        card.setOnClickListener((view) -> this.detail(entry));
+        card.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, I18n.t("Ver registro")));
+            }
+        });
+        Motion.press(card);
+    }
+
+    private void calculations(UiKit uiKit, LinearLayout disclosure, VehicleProfile vehicle) {
+        final FuelSummary latest = FuelSummary.latest(this.entries, vehicle.id);
+        uiKit.eyebrow(disclosure, "CONSUMO POR ABASTECIMENTOS");
+        uiKit.label(disclosure, latest.explanation, 13, UiKit.MUTED, false);
+        if (latest.kmPerLiter != null) {
+            uiKit.button(disclosure, "Como foi calculado", false, () -> message("Distância: " + latest.distance + " km\nVolume: " + latest.liters + " L\n" + latest.explanation + "\nEntradas e revisões: " + String.join(", ", latest.entryRevisions)));
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        int count = 0;
+        for (JournalEntry journalEntry : this.entries) {
+            if (journalEntry.vehicleId.equals(vehicle.id) && !journalEntry.voided && journalEntry.cost != null) {
+                total = total.add(journalEntry.cost);
+                count++;
+            }
+        }
+        uiKit.label(disclosure, count == 0 ? "Custos ainda não informados." : "Total informado: " + Format.money(total) + " · " + Format.count(count, "registro com valor", "registros com valor"), 14, UiKit.TEXT, false);
+    }
+
     boolean isDetached(JournalEntry journalEntry) {
         return !this.host.vehicleIds().contains(journalEntry.vehicleId);
+    }
+
+    private static String day(String isoDate) {
+        try {
+            return java.time.LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (java.time.format.DateTimeParseException e) {
+            return isoDate;
+        }
     }
 
     private static String local(long occurredAt) {
