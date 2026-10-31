@@ -96,6 +96,19 @@ The CI must be green before merging. Pull requests are merged with a merge commi
 
 - `FakeAdapter` plays scripted ELM327 responses for the OBD tests.
 - `ScreensTest` opens the real `MainActivity` with Robolectric and saves screenshots to `app/build/screenshots/`.
+- `AccessibilityScreensTest` goes through every screen with font scale 2.0 and on a 320 dp phone, looking for clipped text, controls without a description and touch targets under 48 dp.
+
+### Screenshot references
+
+`ScreenshotReferenceTest` renders key screens with a fixed clock (`WallClock`) and compares them with the approved images in `app/src/test/screenshots/`. A screen fails when more than a few pixels change; the actual image and a diff with the changes in red are saved to `app/build/screenshots/diferencas/`.
+
+When a visual change is intended, update the references and commit the new images with the change:
+
+```bash
+./gradlew :app:testDebugUnitTest --tests io.rea.obd.ScreenshotReferenceTest -PupdateScreenshots
+```
+
+Review the updated images before committing; they are part of the review.
 
 ## Code Standards
 

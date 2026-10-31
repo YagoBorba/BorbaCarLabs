@@ -152,7 +152,7 @@ public final class HomeScreen {
             return new Due(reminder.dueOdometer == null ? "—" : Format.km(reminder.dueOdometer), "", false);
         }
         LocalDate due = LocalDate.parse(reminder.dueDate);
-        long days = ChronoUnit.DAYS.between(LocalDate.now(), due);
+        long days = ChronoUnit.DAYS.between(WallClock.today(), due);
         String detail = days < 0 ? "vencido há " + Format.count((int) -days, "dia", "dias") : days == 0 ? "vence hoje" : "em " + Format.count((int) days, "dia", "dias");
         if (reminder.dueOdometer != null) {
             detail = detail + " · ou " + Format.km(reminder.dueOdometer);

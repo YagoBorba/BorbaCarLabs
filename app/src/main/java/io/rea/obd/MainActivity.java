@@ -80,6 +80,7 @@ import io.rea.obd.ui.Notice;
 import io.rea.obd.ui.ThemePalette;
 import io.rea.obd.ui.UiKit;
 import io.rea.obd.ui.VehicleEditor;
+import io.rea.obd.ui.WallClock;
 import io.rea.obd.vehicle.VehicleProfile;
 import io.rea.obd.vehicle.VehicleProfileReportV1;
 import io.rea.obd.vehicle.VehicleRecord;
@@ -93,14 +94,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -232,7 +231,7 @@ public final class MainActivity extends Activity {
 
         @Override
         public long epochMillis() {
-            return System.currentTimeMillis();
+            return WallClock.millis();
         }
     };
     private final Runnable pollTask = () -> this.poll();
@@ -946,7 +945,7 @@ public final class MainActivity extends Activity {
     void workshopSummary(DtcReadResult dtcReadResult) {
         String vehicle = this.currentDtcVehicle == null ? "" : this.currentDtcVehicle.name + " · " + this.currentDtcVehicle.description();
         String adapter = this.currentDtcAdapter;
-        final List<String> lines = ReportText.readable(ReadingGuide.workshopSummary(dtcReadResult, vehicle, adapter, dtcReadResult == this.currentDtcRead ? this.currentSupplement : null), java.time.ZoneId.systemDefault());
+        final List<String> lines = ReportText.readable(ReadingGuide.workshopSummary(dtcReadResult, vehicle, adapter, dtcReadResult == this.currentDtcRead ? this.currentSupplement : null), WallClock.zone());
         final String text = String.join("\n", lines);
         new LocalizedDialog(this).setTitle("Resumo para oficina").setMessage(text).setPositiveButton("Compartilhar", (dialog, which) -> shareWorkshopSummary(text)).setNeutralButton("Salvar PDF", (dialog, which) -> saveWorkshopPdf(lines)).setNegativeButton("Fechar", null).show();
     }
@@ -2397,7 +2396,7 @@ public final class MainActivity extends Activity {
                 }
             }
             File file = new File(getCacheDir(), "relatorio-rea-obd.pdf");
-            ReportWriter.pdf(file, ReportText.readable(items, java.time.ZoneId.systemDefault()));
+            ReportWriter.pdf(file, ReportText.readable(items, WallClock.zone()));
             this.pendingPdf = file;
             Intent intent = new Intent("android.intent.action.CREATE_DOCUMENT");
             intent.addCategory("android.intent.category.OPENABLE");
@@ -2553,7 +2552,7 @@ public final class MainActivity extends Activity {
         }
         try {
             boolean demo = dtcReadResult.origin == DataOrigin.SIMULATED;
-            JSONObject json = new JSONObject().put("date", new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(dtcReadResult.completedAtEpochMillis))).put("created_at", Instant.ofEpochMilli(dtcReadResult.completedAtEpochMillis).toString()).put("demo", demo).put("vehicle_id", dtcReadResult.vehicleId == null ? JSONObject.NULL : dtcReadResult.vehicleId);
+            JSONObject json = new JSONObject().put("date", Instant.ofEpochMilli(dtcReadResult.completedAtEpochMillis).atZone(WallClock.zone()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).put("created_at", Instant.ofEpochMilli(dtcReadResult.completedAtEpochMillis).toString()).put("demo", demo).put("vehicle_id", dtcReadResult.vehicleId == null ? JSONObject.NULL : dtcReadResult.vehicleId);
             if (vehicleProfile == null) {
                 vehicleNameSnapshot = "não associado";
             } else {
@@ -3002,7 +3001,7 @@ public final class MainActivity extends Activity {
     private List<String> readableReport(JSONObject document) throws JSONException {
         List<String> lines = new ArrayList<>(DiagnosticCaseJson.report(document));
         lines.addAll(ReportText.referenceAppendix(DiagnosticCaseJson.decode(document.getJSONObject("input"))));
-        return ReportText.readable(lines, java.time.ZoneId.systemDefault());
+        return ReportText.readable(lines, WallClock.zone());
     }
 
     private static final int REMINDER_PERMISSION = 702;
