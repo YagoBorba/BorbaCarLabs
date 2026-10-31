@@ -16,10 +16,10 @@ public final class Format {
     }
 
     public static String when(long epochMillis) {
-        ZoneId zone = ZoneId.systemDefault();
+        ZoneId zone = WallClock.zone();
         ZonedDateTime time = Instant.ofEpochMilli(epochMillis).atZone(zone);
         LocalDate day = time.toLocalDate();
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = WallClock.today();
         String clock = time.format(TIME);
         if (day.equals(today)) {
             return "hoje às " + clock;
@@ -31,7 +31,7 @@ public final class Format {
     }
 
     public static String clock(long epochMillis) {
-        return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(TIME_SECONDS);
+        return Instant.ofEpochMilli(epochMillis).atZone(WallClock.zone()).format(TIME_SECONDS);
     }
 
     public static String count(int n, String singular, String plural) {

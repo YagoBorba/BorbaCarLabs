@@ -30,7 +30,6 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -339,7 +338,7 @@ public final class JournalController {
     }
 
     private static String local(long occurredAt) {
-        return Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm"));
+        return Instant.ofEpochMilli(occurredAt).atZone(WallClock.zone()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm"));
     }
 
     private void open(JournalEntry.Kind kind, JournalEntry journalEntry, Bundle bundle) {
