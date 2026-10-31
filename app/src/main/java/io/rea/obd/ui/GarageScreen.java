@@ -34,7 +34,7 @@ public final class GarageScreen {
     public static void render(final LinearLayout linearLayout, final List<VehicleRecord> list, final String id, final boolean profileLocked, final VehicleCatalogStore.Loaded loaded, final Actions actions) {
         UiKit uiKit = new UiKit(linearLayout.getContext());
         uiKit.eyebrow(linearLayout, "SEUS VEÍCULOS");
-        uiKit.label(linearLayout, "Garagem", 30, UiKit.TEXT, true);
+        uiKit.title(linearLayout, "Garagem", 30);
         uiKit.label(linearLayout, "Selecione o carro que vai acompanhar.", 15, UiKit.MUTED, false);
         Objects.requireNonNull(actions);
         uiKit.button(linearLayout, "Adicionar veículo", true, () -> actions.add()).setEnabled(!profileLocked);

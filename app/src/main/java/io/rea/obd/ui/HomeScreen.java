@@ -34,7 +34,7 @@ public final class HomeScreen {
 
     public static void render(LinearLayout linearLayout, VehicleProfile vehicleProfile, String status, String text, int i, int value, boolean demo, boolean flag, boolean connected, DtcReadResult lastRead, JournalController.Glance glance, VehicleEfficiency.Official official, final Actions actions) {
         UiKit uiKit = new UiKit(linearLayout.getContext());
-        uiKit.label(linearLayout, "Hoje", 22, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(4));
+        uiKit.title(linearLayout, "Hoje", 22).setPadding(0, 0, 0, uiKit.dp(4));
         if (vehicleProfile == null) {
             LinearLayout feature = uiKit.feature(linearLayout);
             uiKit.eyebrow(feature, "SUA GARAGEM");

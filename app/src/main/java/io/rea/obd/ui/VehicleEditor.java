@@ -162,7 +162,7 @@ public final class VehicleEditor {
         this.content = column2;
         scrollView.addView(column2);
         this.ui.label(this.content, "GARAGEM · PASSO " + (this.step + 1) + " DE 3", 12, UiKit.ACCENT, true);
-        this.ui.label(this.content, new String[]{"Qual é o seu carro?", "Versão e detalhes", "Revise seu perfil"}[this.step], 28, UiKit.TEXT, true);
+        this.ui.title(this.content, new String[]{"Qual é o seu carro?", "Versão e detalhes", "Revise seu perfil"}[this.step], 28);
         if (!this.warning.isEmpty()) {
             this.ui.label(this.content, this.warning, 14, UiKit.AMBER, true).setAccessibilityLiveRegion(1);
         }

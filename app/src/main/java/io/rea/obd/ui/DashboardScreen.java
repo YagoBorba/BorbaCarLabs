@@ -113,7 +113,7 @@ public final class DashboardScreen {
         UiKit uiKit = new UiKit(linearLayout.getContext());
         final Views views = new Views();
         Objects.requireNonNull(actions);
-        uiKit.label(linearLayout, "Ao vivo", 22, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        uiKit.title(linearLayout, "Ao vivo", 22).setPadding(0, 0, 0, uiKit.dp(2));
         String vehicle;
         if (vehicleProfile == null) {
             vehicle = "Adicione um perfil na Garagem para associar suas gravações.";
@@ -195,7 +195,7 @@ public final class DashboardScreen {
             return;
         }
         android.content.res.Configuration configuration = parent.getResources().getConfiguration();
-        int columns = configuration.fontScale > 1.3f || configuration.screenWidthDp < 340 ? 1 : configuration.screenWidthDp >= 600 ? 3 : 2;
+        int columns = configuration.fontScale > 1.3f || configuration.screenWidthDp < 300 ? 1 : configuration.screenWidthDp >= 600 ? 3 : 2;
         LinearLayout grid = ui.column();
         grid.setTag(SUMMARY);
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);

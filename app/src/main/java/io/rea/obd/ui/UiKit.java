@@ -115,8 +115,16 @@ public final class UiKit {
         linearLayout.addView(artwork, layoutParams);
     }
 
+    public TextView title(LinearLayout linearLayout, String text, int size) {
+        TextView title = label(linearLayout, text, size, TEXT, true);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            title.setAccessibilityHeading(true);
+        }
+        return title;
+    }
+
     public void section(LinearLayout linearLayout, String text, String text2) {
-        label(linearLayout, text, 20, TEXT, true);
+        title(linearLayout, text, 20);
         if (text2 == null || text2.isEmpty()) {
             return;
         }
