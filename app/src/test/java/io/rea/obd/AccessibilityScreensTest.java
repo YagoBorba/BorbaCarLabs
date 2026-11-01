@@ -1,5 +1,6 @@
 package io.rea.obd;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -209,6 +210,36 @@ public class AccessibilityScreensTest {
         }
     }
 
+    static boolean brokenWord(CharSequence content, int end) {
+        if (end <= 0 || end >= content.length() || !Character.isLetter(content.charAt(end - 1)) || !Character.isLetter(content.charAt(end))) {
+            return false;
+        }
+        int start = end;
+        while (start > 0 && !Character.isWhitespace(content.charAt(start - 1))) {
+            start--;
+        }
+        int stop = end;
+        while (stop < content.length() && !Character.isWhitespace(content.charAt(stop))) {
+            stop++;
+        }
+        for (int i = start; i < stop; i++) {
+            if (Character.isDigit(content.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Test
+    public void identifiersMayBreakButWordsMayNot() {
+        String word = "Diagnóstico";
+        assertTrue(brokenWord(word, word.indexOf("o", 9)));
+        assertFalse(brokenWord("Diagnóstico completo", word.length() + 1));
+        String session = "Sessão de aquisição: 53c3b960-e987-43aa-93ad-dbdd7a7578e3";
+        assertFalse(brokenWord(session, session.indexOf("dbdd") + 2));
+        assertFalse(brokenWord("Placa ABC1D23", "Placa A".length()));
+    }
+
     private void check(View view, String name, int width, float density) {
         if (!view.isShown() || view.getWidth() == 0) {
             return;
@@ -231,8 +262,7 @@ public class AccessibilityScreensTest {
                 }
                 CharSequence content = text.getLayout().getText();
                 for (int line = 0; line + 1 < text.getLineCount(); line++) {
-                    int end = text.getLayout().getLineEnd(line);
-                    if (end > 0 && end < content.length() && Character.isLetter(content.charAt(end - 1)) && Character.isLetter(content.charAt(end))) {
+                    if (brokenWord(content, text.getLayout().getLineEnd(line))) {
                         this.problems.add(name + " | palavra quebrada no meio | " + label);
                         break;
                     }
