@@ -1,5 +1,9 @@
 # Histórico de alterações
 
+## 1.1.1 / Correção crítica — 01/11/2026
+
+- Salvar um perfil na Garagem com marca, modelo, ano ou versão escolhidos do catálogo travava o app ("o aplicativo não está respondendo"): a conferência do catálogo nunca terminava. Agora o perfil salva na hora, e dado de catálogo que não existe no catálogo ou contradiz as outras escolhas continua sendo recusado com aviso. Novos testes salvam perfis de catálogo direto no armazenamento (com tempo-limite) e pelo fluxo completo da tela.
+
 ## 1.1.0 / Confiabilidade — 29/10/2026
 
 - Lembretes de manutenção controlados por serviço: um serviço novo não esconde mais o lembrete de outro (troca de óleo + rodízio de pneus), registrar o mesmo serviço sem novo prazo conclui o lembrete e a tela Hoje mostra o próximo a vencer, não o último cadastrado.
