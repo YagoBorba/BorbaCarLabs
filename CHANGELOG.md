@@ -11,6 +11,10 @@
 - Acessibilidade: com fonte em 200% o cabeçalho fica numa linha só (ícone, estado e Ajustes), o aviso de dados simulados fica curto e a barra de abas usa só texto, deixando mais da metade da tela para o conteúdo. O selo do veredito não corta mais o símbolo. O TalkBack lê o estado da conexão por extenso ("Sem conexão com o adaptador" em vez de "círculo OFFLINE") e encontra os títulos das telas como cabeçalhos. Novos testes percorrem todas as telas com fonte em 200% e numa tela de 320 dp procurando texto cortado, palavra quebrada, conteúdo fora da tela, controle sem descrição e área de toque menor que 48 dp; outro teste confere contraste de pelo menos 4,5:1 nas cores dos temas claro e escuro.
 - Capturas de referência: nove telas (português e inglês, com e sem dados) são comparadas com imagens aprovadas guardadas no repositório, com relógio fixo; uma mudança de cor ou de texto faz o teste falhar e gera uma imagem com a diferença em vermelho. Atualizar as referências é um comando (`-PupdateScreenshots`). Datas e horas exibidas passam a seguir um relógio único do app, e o fuso do aparelho é relido a cada uso.
 
+## 1.1.1 / Correção crítica — 01/11/2026
+
+- Salvar um perfil na Garagem com marca, modelo, ano ou versão escolhidos do catálogo travava o app ("o aplicativo não está respondendo"): a conferência do catálogo nunca terminava. Agora o perfil salva na hora, e dado de catálogo que não existe no catálogo ou contradiz as outras escolhas continua sendo recusado com aviso. Novos testes salvam perfis de catálogo direto no armazenamento (com tempo-limite) e pelo fluxo completo da tela.
+
 ## 1.1.0 / Confiabilidade — 29/10/2026
 
 - Lembretes de manutenção controlados por serviço: um serviço novo não esconde mais o lembrete de outro (troca de óleo + rodízio de pneus), registrar o mesmo serviço sem novo prazo conclui o lembrete e a tela Hoje mostra o próximo a vencer, não o último cadastrado.
