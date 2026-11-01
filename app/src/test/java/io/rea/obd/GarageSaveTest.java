@@ -30,7 +30,7 @@ import org.robolectric.shadows.ShadowAlertDialog;
 import org.robolectric.shadows.ShadowDialog;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 35, qualifiers = "w393dp-h852dp-xhdpi")
+@Config(sdk = 35, qualifiers = "pt-rBR-w393dp-h852dp-xhdpi")
 public class GarageSaveTest {
     private static void idle() {
         shadowOf(Looper.getMainLooper()).idle();
