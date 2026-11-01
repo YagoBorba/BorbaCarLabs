@@ -249,6 +249,7 @@ public final class VehicleEditor {
         final Dialog dialog = this.dialog;
         Objects.requireNonNull(dialog);
         ui.button(column, "Cancelar", false, () -> dialog.dismiss());
+        I18n.apply(column);
     }
 
     void updatePreview() {

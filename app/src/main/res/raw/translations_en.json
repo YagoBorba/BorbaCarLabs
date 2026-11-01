@@ -7,6 +7,7 @@
   "1999 PCED, linha P0300": "1999 PCED, row P0300",
   "1999 PCED, linha P0420": "1999 PCED, row P0420",
   "2 de 2 · consultando prontidão e quadro congelado 00": "2 of 2 · reading readiness and freeze frame 00",
+  "2019 — 36 marcas / 684 modelos; recorte factual MY19": "2019 — 36 makes / 684 models; factual MY19 subset",
   "A aquisição pausa fora deste painel ou do primeiro plano. Cada sinal conserva seu próprio horário; ausência nunca vira zero.": "Acquisition pauses outside this dashboard or when not in the foreground. Each signal keeps its own time; a missing value never becomes zero.",
   "A comunicação com o servidor de IA foi interrompida. Tente novamente.": "Communication with the AI server was interrupted. Try again.",
   "A conexão com o adaptador caiu. Reconecte e tente novamente.": "The connection to the adapter dropped. Reconnect and try again.",
@@ -67,6 +68,7 @@
   "Animações: suaves": "Animations: smooth",
   "Ano de fabricação": "Year of manufacture",
   "Ano inválido": "Invalid year",
+  "Ano-modelo": "Model year",
   "Anotação do usuário não pertence ao catálogo": "User note does not belong to the catalog",
   "Anote quando o sintoma aparece (frio, quente, acelerando, em marcha lenta).": "Note when the symptom shows up (cold, warm, accelerating, idling).",
   "antiga em relação à leitura de DTCs": "older than the DTC reading",
@@ -108,6 +110,7 @@
   "Atualização não avança versão e sequência": "Update does not advance version and sequence",
   "Automático": "Automatic",
   "Automático (idioma do sistema)": "Automatic (system language)",
+  "Automatizado": "Automated manual",
   "Avanço de ignição": "Ignition timing advance",
   "baixa": "low",
   "Bluetooth clássico SPP": "Classic Bluetooth SPP",
@@ -219,6 +222,7 @@
   "conexão encerrada": "connection closed",
   "Conexão encerrada": "Connection closed",
   "Conexão interrompida": "Connection interrupted",
+  "Conferência textual e visual das 16 linhas Chevrolet; extração da tabela (pdftotext -table) com rejeição de linhas ambíguas": "Text and visual check of the 16 Chevrolet rows; table extraction (pdftotext -table) rejecting ambiguous rows",
   "Configuração duplicada": "Duplicate configuration",
   "Configuração fora do mercado publicado": "Configuration outside the published market",
   "Configuração incoerente": "Inconsistent configuration",
@@ -265,8 +269,10 @@
   "Correção longa · banco 1": "Long fuel trim · bank 1",
   "Correção longa · banco 2": "Long fuel trim · bank 2",
   "Corrigir registro": "Correct entry",
+  "Coupé": "Coupe",
   "Crie um perfil, mesmo parcial, para guardar o contexto desta leitura.": "Create a profile, even a partial one, to keep the context of this reading.",
   "CSV salvo.": "CSV saved.",
+  "Curadoria local de fatos de identificação, sem reprodução do PDF, textos, marcas gráficas ou layout. Portal atribui CC BY-ND 3.0 ao conteúdo: https://creativecommons.org/licenses/by-nd/3.0/ . Avaliação e limites: docs/CATALOGO-MY19-0.6.8.md; não representa autorização específica nem endosso do Inmetro.": "Local curation of identification facts, without reproducing the PDF, texts, logos or layout. The portal licenses its content under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/ . Assessment and limits: docs/CATALOGO-MY19-0.6.8.md; this is not a specific authorization or endorsement by Inmetro.",
   "Custos ainda não informados.": "Costs not entered yet.",
   "Dado simulado": "Simulated data",
   "Dado simulado de alimentação": "Simulated power supply data",
@@ -319,10 +325,12 @@
   "Distância com luz de falha acesa": "Distance with MIL on",
   "Distância desde apagar falhas": "Distance since codes cleared",
   "Distância ou volume insuficiente para calcular.": "Not enough distance or volume to calculate.",
+  "Documentado no catálogo": "Documented in the catalog",
   "Documentado no catálogo · veículo não confirmado": "Documented in the catalog · vehicle not confirmed",
   "Documento não reconhecido": "Unrecognized document",
   "DTC incompleto": "Incomplete DTC",
   "DTCs CAN truncados": "Truncated CAN DTCs",
+  "Dupla embreagem": "Dual clutch",
   "Edição não pode trocar identificador": "An edit cannot change the identifier",
   "Editar perfil": "Edit profile",
   "Editar sintomas / criar revisão": "Edit symptoms / create revision",
@@ -454,6 +462,7 @@
   "Formato de leitura não reconhecido": "Unrecognized reading format",
   "Fragmento de informação truncado": "Truncated information fragment",
   "Frequência": "Frequency",
+  "Furgão": "Panel van",
   "Garagem": "Garage",
   "gasolina": "gasoline",
   "Gasolina": "Gasoline",
@@ -736,7 +745,10 @@
   "Para uma nova investigação, usar Ler dados complementares antes de salvar o caso, na mesma sessão e perfil.": "For a new investigation, use Read supplementary data before saving the case, in the same session and profile.",
   "Parar gravação CSV": "Stop CSV recording",
   "Parear outro adaptador…": "Pair another adapter…",
+  "PBE Veicular — Veículos leves 2019": "PBE Veicular (Brazilian vehicle labeling program) — Light vehicles 2019",
   "PDF salvo.": "PDF saved.",
+  "PDF, páginas 1 a 46; linhas de motores a combustão extraídas em modo tabela e validadas coluna a coluna": "PDF, pages 1 to 46; combustion engine rows extracted in table mode and checked column by column",
+  "pendente": "pending",
   "Pendente": "Pending",
   "Pendente (serviço 07): a falha apareceu, mas ainda não foi confirmada em ciclos seguidos.": "Pending (service 07): the fault showed up but has not been confirmed over consecutive drive cycles yet.",
   "Pendente e Permanente": "Pending and Permanent",
@@ -1060,6 +1072,7 @@
   "Veículo ativo não encontrado": "Active vehicle not found",
   "Veículo inexistente": "Vehicle does not exist",
   "VEÍCULO NÃO ASSOCIADO": "VEHICLE NOT LINKED",
+  "veículo não confirmado": "vehicle not confirmed",
   "Velocidade": "Speed",
   "velocidade, marcha lenta ou entradas auxiliares": "speed, idle or auxiliary inputs",
   "vence hoje": "due today",
@@ -1094,6 +1107,42 @@
   "Voltar ao diagnóstico": "Back to diagnosis"
  },
  "patterns": [
+  [
+   "Escolher (.+)\\. (.+)",
+   "Choose @1. @2"
+  ],
+  [
+   "Ano-modelo: (.+)",
+   "Model year: @1"
+  ],
+  [
+   "Ano de fabricação: (.+)",
+   "Year of manufacture: @1"
+  ],
+  [
+   "Mercado / país: (.+)",
+   "Market / country: @1"
+  ],
+  [
+   "Versão: (.+)",
+   "Version: @1"
+  ],
+  [
+   "Combustível: (.+)",
+   "Fuel: @1"
+  ],
+  [
+   "Observações: (.+)",
+   "Notes: @1"
+  ],
+  [
+   "(\\d+) marchas",
+   "$1-speed"
+  ],
+  [
+   "Base PBE Veicular (\\d+) \\(Inmetro\\): (\\d+) versões de (\\d+) marcas com motor a combustão\\. Outros modelos podem ser cadastrados como perfil simples\\.",
+   "PBE Veicular $1 base (Inmetro): $2 versions from $3 makes with combustion engines. Other models can be added as a simple profile."
+  ],
   [
    "página (\\d+) de (\\d+)",
    "page $1 of $2"
@@ -1704,11 +1753,11 @@
   ],
   [
    "Permissão declarada: (.+)",
-   "Declared permission: $1"
+   "Declared permission: @1"
   ],
   [
    "Referência: (.+)",
-   "Reference: $1"
+   "Reference: @1"
   ],
   [
    "Revisão: (.+)",
@@ -1716,7 +1765,7 @@
   ],
   [
    "Documento: (.+)",
-   "Document: $1"
+   "Document: @1"
   ],
   [
    "Editor: (.+)",
@@ -1724,11 +1773,11 @@
   ],
   [
    "Localização: (.+)",
-   "Location: $1"
+   "Location: @1"
   ],
   [
    "Seção: (.+)",
-   "Section: $1"
+   "Section: @1"
   ],
   [
    "Escopo: (.+)",
@@ -1736,7 +1785,7 @@
   ],
   [
    "Revisão de origem declarada: (.+)",
-   "Declared source revision: $1"
+   "Declared source revision: @1"
   ],
   [
    "Perfil: (.+)",
@@ -1788,11 +1837,11 @@
   ],
   [
    "Fabricante: (.+)",
-   "Manufacturer: $1"
+   "Make: @1"
   ],
   [
    "Modelo: (.+)",
-   "Model: $1"
+   "Model: @1"
   ],
   [
    "Android: (.+)",
