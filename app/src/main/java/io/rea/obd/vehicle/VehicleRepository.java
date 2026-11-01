@@ -99,29 +99,7 @@ public final class VehicleRepository {
         for (VehicleAttribute vehicleAttribute : vehicleRecord.attributes().values()) {
             if (vehicleAttribute.provenance != null && vehicleAttribute.provenance.origin == FactProvenance.Origin.CATALOG) {
                 VehicleAttribute attribute = vehicleRecord2 == null ? null : vehicleRecord2.attribute(vehicleAttribute.key);
-                if (attribute == null || !Objects.equals(vehicleAttribute.value, attribute.value) || !sameProvenance(vehicleAttribute.provenance, attribute.provenance)) {
-                    if (vehicleCatalog != null) {
-                        Iterator<VehicleCatalog.Configuration> it = vehicleCatalog.configurations.values().iterator();
-                        while (true) {
-                            if (it.hasNext()) {
-                                VehicleCatalog.Configuration next = it.next();
-                                VehicleAttribute attributes = next.attributes.get(vehicleAttribute.key);
-                                if (attributes != null && vehicleAttribute.equals(attributes)) {
-                                    Iterator<VehicleAttribute> iterator = vehicleRecord.attributes().values().iterator();
-                                    while (true) {
-                                        if (!iterator.hasNext()) {
-                                            break;
-                                        }
-                                        VehicleAttribute next2 = iterator.next();
-                                        VehicleAttribute attributes2 = next.attributes.get(next2.key);
-                                        if (next2.value != null && attributes2 != null && !next2.value.equals(attributes2.value)) {
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if ((attribute == null || !Objects.equals(vehicleAttribute.value, attribute.value) || !sameProvenance(vehicleAttribute.provenance, attribute.provenance)) && !inCatalog(vehicleCatalog, vehicleRecord, vehicleAttribute)) {
                     throw new IllegalArgumentException("Atributo sem configuração disponível e coerente no catálogo revisado");
                 }
                 if (text != null && !text.equals(vehicleAttribute.provenance.scope)) {
@@ -143,6 +121,28 @@ public final class VehicleRepository {
             items.set(value, vehicleRecord);
         }
         persist(items, this.activeId.isEmpty() ? vehicleRecord.id : this.activeId);
+    }
+
+    private static boolean inCatalog(VehicleCatalog vehicleCatalog, VehicleRecord vehicleRecord, VehicleAttribute vehicleAttribute) {
+        if (vehicleCatalog == null) {
+            return false;
+        }
+        for (VehicleCatalog.Configuration configuration : vehicleCatalog.configurations.values()) {
+            if (vehicleAttribute.equals(configuration.attributes.get(vehicleAttribute.key)) && coherent(configuration, vehicleRecord)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean coherent(VehicleCatalog.Configuration configuration, VehicleRecord vehicleRecord) {
+        for (VehicleAttribute vehicleAttribute : vehicleRecord.attributes().values()) {
+            VehicleAttribute expected = configuration.attributes.get(vehicleAttribute.key);
+            if (vehicleAttribute.value != null && expected != null && !vehicleAttribute.value.equals(expected.value)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean sameProvenance(FactProvenance factProvenance, FactProvenance provenance) {
