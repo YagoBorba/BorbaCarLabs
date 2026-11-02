@@ -2,6 +2,9 @@
 
 ## Em desenvolvimento
 
+- Busca de carros de 2012 a 2026: o catálogo passa de 516 versões só do ano-modelo 2019 para 9.362 versões de 504 modelos e 43 marcas, extraídas das tabelas anuais do PBE Veicular (Inmetro). Entram modelos que faltavam (Kwid, Tracker, Jetta, T-Cross, Montana, Equinox, Peugeot 308 e 3008) e os nomes partidos ou divididos da tabela de 2019 foram corrigidos ("Turbo", "Town &", "RAV4 4X2", "Saveiro CD", "Novo Cruze", "XC90 (2019)"). O catálogo carrega em segundo plano e o consumo oficial vale para os anos novos.
+- Garagem com busca por texto: "Buscar meu carro" acha a versão com poucas palavras ("onix 2019 ltz") e leva direto à revisão. As listas ficam em ordem alfabética sem diferença de maiúsculas, os anos começam pelo mais novo, "Não sei" vai para o fim e as versões não repetem o ano. Digitar à mão um ano que existe no catálogo não apaga mais as escolhas de marca e modelo. A revisão mostra a origem dos dados uma vez só, e o nome padrão inclui a marca ("Chevrolet Cobalt 2019").
+- VIN e calibração dizem a marca e o ano-modelo lidos do VIN, sem internet, e avisam quando não batem com o perfil ativo.
 - Tela Hoje mais compacta: cartão do veículo com ilustração menor ao lado do nome e um resumo único com última leitura, próximo serviço e consumo, visíveis sem rolar em telas de 360x640 dp e legíveis com fonte grande.
 - App em português e inglês: novo item Idioma em Ajustes (Automático, Português ou English). Telas, diálogos, notificações de lembrete, relatórios TXT/PDF e catálogo de códigos traduzidos; números seguem o idioma (12,4 ou 12.4). A análise por IA responde no idioma escolhido. Casos salvos não mudam: a tradução acontece só na exibição.
 - Diagnóstico mostra o resultado primeiro: depois de uma leitura, veredito e códigos abrem a tela e os controles de conexão ficam recolhidos em "Conexão e nova leitura"; durante a leitura o layout anterior continua, com o progresso visível.
