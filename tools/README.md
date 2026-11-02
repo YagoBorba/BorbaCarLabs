@@ -40,9 +40,15 @@ node tools/pbev-catalog.mjs pbev pbev/catalogo-anterior.json novo.json relatorio
 O relatório (`relatorio.json`) lista cada linha rejeitada e o motivo. O consumo oficial
 (km/l na cidade e na estrada) é lido da mesma linha quando as colunas fecham: 9.124 versões têm.
 
-## Catálogo de códigos (`DtcReference`, generic-dtc-2)
+## Catálogo de códigos (`DtcReference`, generic-dtc-3)
 
 Significados conferidos na tabela pública de códigos genéricos P0 do Ford PCED 1999 (seção 4)
 e no boletim VW 24Y2 hospedado pela NHTSA (página 3). Textos curtos escritos para o app; as fontes
 são citadas, não reproduzidas. Ficaram de fora códigos de fabricante (P1) e quatro códigos cujo
 texto na fonte é repetido ou tem erro (P0141, P0161, P0180, P0553).
+
+Na generic-dtc-3 entram 26 códigos comuns que faltavam (P0011 a P0019, P0068, P0101, P0128, P0219,
+P0335, P0336, P0506, P0507, P0562, P0563, P0627, P0641 e U0001, U0073, U0100, U0101, U0121, U0140,
+U0155), conferidos na tabela "2014 OBD-II 5 Digit Code Interpretation" publicada pela Ford Performance
+Parts (PDF de 93 páginas, SHA-256 `38b56df0e234b89eae1854823cfa4e7b5331f2da3be18ef78102b428305f8627`,
+consultado em 01/11/2026). Cada definição cita a página e a linha.

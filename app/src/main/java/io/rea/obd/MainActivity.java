@@ -1442,7 +1442,7 @@ public final class MainActivity extends Activity {
         LinearLayout linearLayout = new LinearLayout(this);
         linearLayout.setOrientation(LinearLayout.VERTICAL);
         linearLayout.setPadding(dp(18.0f), dp(10.0f), dp(18.0f), dp(16.0f));
-        label(linearLayout, "Catálogo " + DtcReference.VERSION + " · significados genéricos de " + DtcReference.all().size() + " códigos P0, conferidos em documentos públicos de fabricantes. Não determina causas, peças ou compatibilidade específica.", 14, this.TEXT, false);
+        label(linearLayout, "Catálogo " + DtcReference.VERSION + " · significados genéricos de " + DtcReference.all().size() + " códigos P0 e U0, conferidos em documentos públicos de fabricantes. Não determina causas, peças ou compatibilidade específica.", 14, this.TEXT, false);
         final EditText editText = new EditText(this);
         editText.setTextColor(this.TEXT);
         editText.setHintTextColor(this.MUTED);
