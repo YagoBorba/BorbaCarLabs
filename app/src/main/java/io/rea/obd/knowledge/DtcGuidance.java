@@ -65,7 +65,15 @@ public final class DtcGuidance {
             return new DtcGuidance(Level.AVOID, "Sem o sinal de rotação o motor pode apagar ou não ligar.",
                     "Sensor de rotação", "Conector ou chicote do sensor", "Roda fônica danificada");
         }
-        if (in(number, 230, 234) || number == 87 || number == 88) {
+        if (number == 562 || number == 563) {
+            return new DtcGuidance(Level.SCHEDULE, "Tensão fora da faixa pode impedir a partida ou desligar acessórios.",
+                    "Bateria fraca ou terminal solto", "Alternador ou regulador de tensão", "Aterramento");
+        }
+        if (number == 219) {
+            return new DtcGuidance(Level.SCHEDULE, "A rotação passou do limite em algum momento; evite levar o motor ao corte.",
+                    "Redução de marcha em velocidade alta", "Patinagem da embreagem");
+        }
+        if (in(number, 230, 234) || number == 87 || number == 88 || number == 627) {
             return new DtcGuidance(Level.AVOID, "Pode haver perda de força ou o motor pode apagar.",
                     "Bomba ou relé de combustível", "Filtro de combustível", "Pressão do turbo fora do controle");
         }
