@@ -75,7 +75,7 @@ public final class HomeScreen {
                 uiKit.label(linearLayout, "Registre abastecimentos e serviços para acompanhar consumo e lembretes de manutenção.", 14, UiKit.MUTED, false);
                 uiKit.row(linearLayout, "Abrir o Diário", open);
             } else {
-                uiKit.row(linearLayout, "Abrir o Diário · " + Format.count(glance.count, "registro", "registros"), open);
+                uiKit.row(linearLayout, "Abrir o Diário · " + Format.count(glance.count, "registro", "registros") + (glance.odometer == null ? "" : " · " + Format.km(glance.odometer)), open).setTag("home-journal");
             }
         }
     }

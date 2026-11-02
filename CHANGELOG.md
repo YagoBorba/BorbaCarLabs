@@ -2,6 +2,7 @@
 
 ## Em desenvolvimento
 
+- A tela Hoje mostra a quilometragem do último registro do Diário no atalho "Abrir o Diário". Dá para trocar o tema durante a demonstração: ela é encerrada e o app reabre com o tema novo.
 - Catálogo de códigos com 26 códigos comuns a mais, conferidos na tabela pública de códigos OBD-II da Ford (2014): sincronismo do comando (P0011 a P0019), fluxo de ar (P0101), válvula termostática (P0128), sensor de rotação (P0335, P0336), marcha lenta (P0506, P0507), tensão do sistema (P0562, P0563), bomba de combustível (P0627) e comunicação entre módulos (U0001, U0073, U0100, U0101, U0121, U0140, U0155). Tensão do sistema ganhou orientação e causas comuns.
 - Ajustes organizados em Demonstração (agora no topo), Uso do dia a dia (lembretes, tema e idioma) e Avançado (análise por IA, identificação automática e privacidade). O tema aparece uma vez só, no próprio botão. Em Ajustes nenhuma aba fica marcada (antes a barra marcava "Hoje"), e o cabeçalho diz "DESCONECTADO" em vez de "OFFLINE" no app em português.
 - Menos ressalvas nas telas principais: o Diário e o formulário de registro mostram só o nome do perfil, e a última leitura na tela Hoje deixa de dizer "origem conforme registro". A origem continua nos detalhes, nos relatórios e no resumo para oficina.

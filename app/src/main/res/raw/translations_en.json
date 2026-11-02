@@ -393,6 +393,7 @@
   "ELM327DSK, página 35, exemplo P0133": "ELM327DSK, page 35, example P0133",
   "EM DESENVOLVIMENTO": "IN DEVELOPMENT",
   "Em que condição o alerta apareceu e quais outros códigos foram registrados?": "Under what condition did the alert appear and which other codes were logged?",
+  "Encerre a conexão e a gravação antes de mudar o tema. Isso preserva sua sessão atual.": "End the connection and recording before changing the theme. This keeps your current session.",
   "Encerre a conexão ou demonstração antes de salvar o perfil.": "End the connection or demo before saving the profile.",
   "Encerre a conexão ou demonstração antes de trocar ou editar o perfil.": "End the connection or demo before switching or editing the profile.",
   "Encerre a conexão, demonstração e gravação antes de mudar o tema. Isso preserva sua sessão atual.": "End the connection, demo and recording before changing the theme. This keeps your current session.",
