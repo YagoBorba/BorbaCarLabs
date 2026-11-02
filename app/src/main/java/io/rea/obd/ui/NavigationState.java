@@ -28,7 +28,7 @@ public final class NavigationState {
             return 1;
         }
         if (i != 2) {
-            return (i == 5 || i == 6) ? 2 : 0;
+            return (i == 5 || i == 6) ? 2 : i == 3 ? -1 : 0;
         }
         return 3;
     }

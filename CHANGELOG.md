@@ -2,6 +2,8 @@
 
 ## Em desenvolvimento
 
+- Ajustes organizados em Demonstração (agora no topo), Uso do dia a dia (lembretes, tema e idioma) e Avançado (análise por IA, identificação automática e privacidade). O tema aparece uma vez só, no próprio botão. Em Ajustes nenhuma aba fica marcada (antes a barra marcava "Hoje"), e o cabeçalho diz "DESCONECTADO" em vez de "OFFLINE" no app em português.
+- Menos ressalvas nas telas principais: o Diário e o formulário de registro mostram só o nome do perfil, e a última leitura na tela Hoje deixa de dizer "origem conforme registro". A origem continua nos detalhes, nos relatórios e no resumo para oficina.
 - "Posso continuar rodando?": cada código mostra uma orientação geral (pare assim que for seguro, evite rodar até a oficina, ou pode rodar com atenção e agendar) e, em "Entender esta leitura", uma frase sobre o efeito e as causas comuns, marcadas como não confirmadas. O resumo para oficina inclui as duas. Códigos de fabricante e de outros sistemas (P1, B, C, U) não recebem orientação geral.
 - Ao vivo mais limpo: os cartões de sensor não repetem mais "Simulado" (o aviso de dados simulados, o cartão aberto e o leitor de tela continuam dizendo) e mostram alertas de temperatura do motor alta, tensão do módulo fora da faixa e rotação muito alta. "há 0 s" virou "agora" e o botão "Voltar ao diagnóstico" saiu do topo (a aba e o botão Voltar levam ao mesmo lugar).
 - A leitura guiada explica as consultas só na primeira vez; depois começa direto.
