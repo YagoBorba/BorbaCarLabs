@@ -138,6 +138,11 @@ public final class ReadingGuide {
             if (code.structure != null) {
                 lines.add("  " + code.structure);
             }
+            io.rea.obd.knowledge.DtcGuidance guidance = io.rea.obd.knowledge.DtcGuidance.of(code.code);
+            lines.add("  Orientação geral: " + guidance.headline());
+            if (!guidance.causes.isEmpty()) {
+                lines.add("  Causas comuns, não confirmadas: " + String.join(" · ", guidance.causes));
+            }
             if (code.question != null) {
                 lines.add("  Pergunta de contexto: " + code.question);
             }

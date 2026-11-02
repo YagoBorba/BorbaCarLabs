@@ -682,7 +682,6 @@ public final class MainActivity extends Activity {
         }
         int page2 = this.page;
         if (page2 == 0) {
-            button(this.body, "Voltar ao diagnóstico", false, () -> navigate(1));
             dashboard();
         } else if (page2 == 1) {
             diagnostics();
@@ -972,6 +971,8 @@ public final class MainActivity extends Activity {
             }
             DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
             label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
+            io.rea.obd.knowledge.DtcGuidance guidance = io.rea.obd.knowledge.DtcGuidance.of(dtcObservation.code);
+            label(card, guidance.headline(), 14, guidance.urgent() ? this.AMBER : this.ACCENT, true).setTag("guidance-" + dtcObservation.code);
             button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
         }
     }
@@ -2083,7 +2084,10 @@ public final class MainActivity extends Activity {
             return;
         }
         if (this.demo || connected()) {
-            if (activeVehicle() != null) {
+            if (activeVehicle() != null && getPreferences(0).getBoolean("guided_read_explained", false)) {
+                startGuidedRead();
+            } else if (activeVehicle() != null) {
+                getPreferences(0).edit().putBoolean("guided_read_explained", true).apply();
                 new LocalizedDialog(this).setTitle("Leitura guiada").setMessage(("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n" + DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT + "\n\n").concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
             } else {
                 navigate(2);
