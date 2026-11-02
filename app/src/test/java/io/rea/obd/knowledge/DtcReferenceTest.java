@@ -22,14 +22,14 @@ public class DtcReferenceTest {
             assertSame(frozen, DtcReference.find(frozen.code));
         }
         assertTrue(DtcReference.all().size() >= 90);
-        assertEquals("generic-dtc-2:P0302", DtcReference.find("P0302").id);
+        assertEquals("generic-dtc-3:P0302", DtcReference.find("P0302").id);
     }
 
     @Test
     public void onlyGenericCodesWithResolvableSources() {
         String previous = "";
         for (DtcDefinition definition : DtcReference.all()) {
-            assertTrue(definition.code, definition.code.startsWith("P0"));
+            assertTrue(definition.code, definition.code.startsWith("P0") || definition.code.startsWith("U0"));
             assertNotNull(definition.code, DtcStructure.describe(definition.code));
             assertFalse(DtcReference.sources(definition).isEmpty());
             assertTrue("sorted", definition.code.compareTo(previous) > 0);
@@ -44,5 +44,15 @@ public class DtcReferenceTest {
         }
         assertNotNull(DtcReference.find("P0420"));
         assertNotNull(DtcReference.find("P0176"));
+    }
+
+    @Test
+    public void commonCodesFromTheFord2014ListAreDescribed() {
+        for (String code : new String[]{"P0016", "P0101", "P0128", "P0335", "P0506", "P0507", "P0562", "U0100", "U0121"}) {
+            DtcDefinition definition = DtcReference.find(code);
+            assertNotNull(code, definition);
+            assertEquals(code, "ford-boss302s-2014-obd-codes", DtcReference.sources(definition).get(0).id);
+            assertTrue(code, definition.sourceSection.startsWith("Ford 2014 OBD-II, página "));
+        }
     }
 }

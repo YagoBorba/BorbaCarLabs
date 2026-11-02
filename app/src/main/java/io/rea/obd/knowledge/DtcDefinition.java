@@ -19,7 +19,7 @@ public final class DtcDefinition {
     }
 
     public DtcDefinition(String catalog, String code, String meaning, String question, String sourceSection, List<String> list) {
-        if (code == null || !code.matches("P0[0-9A-F]{3}") || meaning == null || meaning.isEmpty() || question == null || question.isEmpty() || sourceSection == null || sourceSection.isEmpty() || list == null || list.isEmpty() || list.contains(null)) {
+        if (code == null || !code.matches("[PU]0[0-9A-F]{3}") || meaning == null || meaning.isEmpty() || question == null || question.isEmpty() || sourceSection == null || sourceSection.isEmpty() || list == null || list.isEmpty() || list.contains(null)) {
             throw new IllegalArgumentException("Definição incompleta");
         }
         this.id = catalog + ":" + code;
