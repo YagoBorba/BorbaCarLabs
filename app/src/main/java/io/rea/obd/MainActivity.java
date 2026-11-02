@@ -3,6 +3,7 @@ package io.rea.obd;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -28,6 +29,7 @@ import android.util.SparseIntArray;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -152,6 +154,8 @@ public final class MainActivity extends Activity {
     private File pendingCaseExport;
     private File pendingPdf;
     private TelemetryRecorder recorder;
+    private String[] pendingAdapter;
+    private int pollFailures;
     private TextView recordingBanner;
     private LinearLayout root;
     private DataOrigin historyOrigin;
@@ -733,6 +737,11 @@ public final class MainActivity extends Activity {
             value2 = 13;
         }
         I18n.apply(this.root);
+        if (this.page == 0 && (connected() || this.demo || this.recorder != null)) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     public void navigate(int i) {
@@ -1503,8 +1512,13 @@ public final class MainActivity extends Activity {
     }
 
     public void chooseTransport() {
-        if (activeVehicle() != null) {
-            ConnectionScreen.show(this, new ConnectionScreen.Actions() {
+        {
+            ConnectionScreen.show(this, lastAdapterName(), new ConnectionScreen.Actions() {
+                @Override
+                public void last() {
+                    MainActivity.this.reconnectLast();
+                }
+
                 @Override
                 public void nearby() {
                     MainActivity.this.scanBle();
@@ -1520,11 +1534,53 @@ public final class MainActivity extends Activity {
                     MainActivity.this.wifiDialog();
                 }
             });
+        }
+    }
+
+    String lastAdapterName() {
+        SharedPreferences preferences = getPreferences(0);
+        return preferences.getString("last_adapter_kind", "").isEmpty() ? null : preferences.getString("last_adapter_name", "adaptador");
+    }
+
+    public void reconnectLast() {
+        SharedPreferences preferences = getPreferences(0);
+        String kind = preferences.getString("last_adapter_kind", "");
+        String address = preferences.getString("last_adapter_address", "");
+        String name = preferences.getString("last_adapter_name", address);
+        if (kind.equals("wifi")) {
+            try {
+                int colon = address.lastIndexOf(':');
+                Transports.Wifi wifi = new Transports.Wifi(address.substring(0, colon), Integer.parseInt(address.substring(colon + 1)));
+                this.pendingAdapter = new String[]{kind, address, name};
+                connect(wifi, name);
+            } catch (Exception e) {
+                message("Informe IP e porta válidos.");
+            }
             return;
         }
-        this.page = 2;
-        render();
-        message("Selecione um veículo antes de conectar.");
+        if (this.adapter == null) {
+            message("Este aparelho não possui Bluetooth compatível.");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 31 && (checkSelfPermission("android.permission.BLUETOOTH_CONNECT") != PackageManager.PERMISSION_GRANTED || checkSelfPermission("android.permission.BLUETOOTH_SCAN") != PackageManager.PERMISSION_GRANTED)) {
+            requestPermissions(new String[]{"android.permission.BLUETOOTH_CONNECT", "android.permission.BLUETOOTH_SCAN"}, 102);
+            return;
+        }
+        try {
+            if (!this.adapter.isEnabled()) {
+                message("Ative o Bluetooth nas configurações.");
+                return;
+            }
+            BluetoothDevice device = this.adapter.getRemoteDevice(address);
+            this.pendingAdapter = new String[]{kind, address, name};
+            connect(kind.equals("ble") ? new Transports.Ble(this, device) : new Transports.Classic(device, this.adapter), name);
+        } catch (IllegalArgumentException | SecurityException e) {
+            message("Não foi possível reconectar. Escolha o adaptador de novo.");
+        }
+    }
+
+    static boolean looksLikeObd(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).matches(".*(obd|elm|vgate|v-link|vlink|veepeak|konnwei|icar|scan|carista|kiwi|obdlink|ancel|autel|launch).*");
     }
 
     public void chooseDevice() {
@@ -1541,14 +1597,18 @@ public final class MainActivity extends Activity {
                 new LocalizedDialog(this).setTitle("Ative o Bluetooth").setMessage("Ative o Bluetooth e pareie seu adaptador nas configurações do Android.").setPositiveButton("Abrir configurações", (dialog, which) -> startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"))).setNegativeButton("Cancelar", null).show();
                 return;
             }
-            final ArrayList items = new ArrayList(this.adapter.getBondedDevices());
-            items.sort(Comparator.comparing((obj) -> ((BluetoothDevice) obj).getAddress()));
+            final ArrayList<BluetoothDevice> items = new ArrayList<>(this.adapter.getBondedDevices());
+            final Map<BluetoothDevice, String> names = new HashMap<>();
+            for (BluetoothDevice device : items) {
+                names.put(device, device.getName() == null ? "Dispositivo Bluetooth" : device.getName());
+            }
+            items.sort(Comparator.comparing((BluetoothDevice device) -> !looksLikeObd(names.get(device))).thenComparing(device -> names.get(device).toLowerCase(Locale.ROOT)));
             int size = items.size();
             final String[] parts = new String[size + 1];
             for (int i = 0; i < items.size(); i++) {
-                BluetoothDevice bluetoothDevice = (BluetoothDevice) items.get(i);
+                BluetoothDevice bluetoothDevice = items.get(i);
                 StringBuilder builder = new StringBuilder();
-                builder.append(bluetoothDevice.getName() == null ? "Dispositivo Bluetooth" : bluetoothDevice.getName());
+                builder.append(names.get(bluetoothDevice));
                 builder.append("\n");
                 builder.append(bluetoothDevice.getAddress());
                 parts[i] = builder.toString();
@@ -1558,7 +1618,8 @@ public final class MainActivity extends Activity {
                 if (which == items.size()) {
                     startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"));
                 } else {
-                    connect(new Transports.Classic((BluetoothDevice) items.get(which), this.adapter), parts[which].split("\\n")[0]);
+                    this.pendingAdapter = new String[]{"classic", items.get(which).getAddress(), parts[which].split("\\n")[0]};
+                    connect(new Transports.Classic(items.get(which), this.adapter), parts[which].split("\\n")[0]);
                 }
             }).setNegativeButton("Cancelar", null).show();
         } catch (SecurityException ignored) {
@@ -1592,6 +1653,9 @@ public final class MainActivity extends Activity {
         if (i == 101) {
             scanBle();
         }
+        if (i == 102) {
+            reconnectLast();
+        }
     }
 
     public void wifiDialog() {
@@ -1601,12 +1665,12 @@ public final class MainActivity extends Activity {
         final EditText editText = new EditText(this);
         editText.setSingleLine(true);
         editText.setHint("IP do adaptador (ex.: 192.168.0.10)");
-        editText.setText(getPreferences(0).getString("wifi_host", ""));
+        editText.setText(getPreferences(0).getString("wifi_host", "192.168.0.10"));
         linearLayout.addView(editText);
         final EditText editText2 = new EditText(this);
         editText2.setInputType(InputType.TYPE_CLASS_NUMBER);
-        editText2.setHint("Porta documentada pelo fabricante");
-        editText2.setText(getPreferences(0).getString("wifi_port", ""));
+        editText2.setHint("Porta (a mais comum é 35000)");
+        editText2.setText(getPreferences(0).getString("wifi_port", "35000"));
         linearLayout.addView(editText2);
         new LocalizedDialog(this).setTitle("Adaptador Wi-Fi TCP").setView(linearLayout).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", (dialog, which) -> {
             try {
@@ -1616,6 +1680,7 @@ public final class MainActivity extends Activity {
                     throw new IllegalArgumentException();
                 }
                 getPreferences(0).edit().putString("wifi_host", wifiHost).putString("wifi_port", Integer.toString(value)).apply();
+                this.pendingAdapter = new String[]{"wifi", wifiHost + ":" + value, wifiHost + ":" + value};
                 connect(new Transports.Wifi(wifiHost, value), wifiHost + ":" + value);
             } catch (Exception ignored) {
                 message("Informe IP e porta válidos.");
@@ -1648,11 +1713,15 @@ public final class MainActivity extends Activity {
             return;
         }
         final LinkedHashMap map = new LinkedHashMap();
+        final List<BluetoothDevice> found = new ArrayList<>();
+        final int[] obdCount = {0};
         final ArrayAdapter arrayAdapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1);
         final AlertDialog alertDialog = new LocalizedDialog(this).setTitle("Procurando adaptadores BLE…").setAdapter(arrayAdapter, (dialog, which) -> {
-            BluetoothDevice bluetoothDevice = (BluetoothDevice) new ArrayList(map.values()).get(which);
+            BluetoothDevice bluetoothDevice = found.get(which);
             stopBleScan();
-            connect(new Transports.Ble(this, bluetoothDevice), (String) arrayAdapter.getItem(which));
+            String label = ((String) arrayAdapter.getItem(which)).split(" · ")[0];
+            this.pendingAdapter = new String[]{"ble", bluetoothDevice.getAddress(), label};
+            connect(new Transports.Ble(this, bluetoothDevice), label);
         }).setNegativeButton("Cancelar", (dialog, which) -> stopBleScan()).create();
         final ScanCallback scanCallback = new ScanCallback() {
             @Override
@@ -1670,15 +1739,12 @@ public final class MainActivity extends Activity {
                 }
                 map.put(device.getAddress(), device);
                 String name = device.getName();
-                ArrayAdapter arrayAdapter2 = arrayAdapter;
-                StringBuilder builder = new StringBuilder();
-                if (name == null) {
-                    name = "Dispositivo BLE";
+                if (name == null || name.trim().isEmpty()) {
+                    return;
                 }
-                builder.append(name);
-                builder.append(" · ");
-                builder.append(device.getAddress());
-                arrayAdapter2.add(builder.toString());
+                int position = looksLikeObd(name) ? obdCount[0]++ : found.size();
+                found.add(position, device);
+                arrayAdapter.insert(name + " · " + device.getAddress(), position);
             }
         };
         this.bleCallback = scanCallback;
@@ -1718,7 +1784,7 @@ public final class MainActivity extends Activity {
     }
 
     private void connect(ElmTransport elmTransport, String deviceName) {
-        disconnect();
+        disconnect(false);
         this.acquisitionSessionId = UUID.randomUUID().toString();
         final int i = this.session;
         final ElmSession elmSession = new ElmSession(elmTransport);
@@ -1732,6 +1798,7 @@ public final class MainActivity extends Activity {
             ScheduledExecutorService scheduledExecutorService = this.watchdog;
             Objects.requireNonNull(elmSession);
             ScheduledFuture<?> schedule = scheduledExecutorService.schedule(() -> elmSession.close(), 35L, TimeUnit.SECONDS);
+            String[] candidate = this.pendingAdapter;
             try {
                 elmSession.connect();
                 schedule.cancel(false);
@@ -1743,6 +1810,10 @@ public final class MainActivity extends Activity {
                         connectionLost(elmSession);
                         return;
                     }
+                    if (candidate != null) {
+                        getPreferences(0).edit().putString("last_adapter_kind", candidate[0]).putString("last_adapter_address", candidate[1]).putString("last_adapter_name", candidate[2]).apply();
+                    }
+                    this.pollFailures = 0;
                     this.busy = false;
                     this.status = this.deviceName + " · ECU respondeu · " + elmSession.protocol();
                     render();
@@ -1766,6 +1837,11 @@ public final class MainActivity extends Activity {
     }
 
     public void disconnect() {
+        disconnect(true);
+    }
+
+    private void disconnect(boolean keepReading) {
+        boolean keep = keepReading && !this.demo && this.currentDtcRead != null;
         this.session++;
         this.guidedStatus = "";
         this.guidedCompleted = 0;
@@ -1784,18 +1860,20 @@ public final class MainActivity extends Activity {
         clearHistories();
         this.voltage = "—";
         this.voltageOrigin = null;
-        this.currentDtcRead = null;
-        this.currentDtcVehicle = null;
-        this.currentDtcRecord = null;
-        this.currentSupplement = null;
-        this.currentCaseSamples = Collections.emptyList();
-        this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
+        if (!keep) {
+            this.currentDtcRead = null;
+            this.currentDtcVehicle = null;
+            this.currentDtcRecord = null;
+            this.currentSupplement = null;
+            this.currentCaseSamples = Collections.emptyList();
+            this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
+        }
         this.status = "Nenhum adaptador conectado";
         render();
     }
 
     public void startDemo() {
-        disconnect();
+        disconnect(false);
         this.acquisitionSessionId = UUID.randomUUID().toString();
         this.demo = true;
         this.status = "Simulador local · dados fictícios";
@@ -1806,7 +1884,7 @@ public final class MainActivity extends Activity {
 
     public void schedulePoll(long value) {
         this.ui.removeCallbacks(this.pollTask);
-        if (this.resumed && !this.destroyed && this.page == 0) {
+        if (this.resumed && !this.destroyed && (this.page == 0 || this.recorder != null)) {
             if (this.demo || connected()) {
                 this.ui.postDelayed(this.pollTask, value);
             }
@@ -1814,7 +1892,7 @@ public final class MainActivity extends Activity {
     }
 
     public void poll() {
-        if (!this.resumed || this.page != 0 || this.busy || this.polling) {
+        if (!this.resumed || (this.page != 0 && this.recorder == null) || this.busy || this.polling) {
             return;
         }
         if (this.demo || connected()) {
@@ -1866,10 +1944,16 @@ public final class MainActivity extends Activity {
                         acceptSample(it.next());
                     }
                     if (poll.failure != null) {
+                        this.pollFailures++;
+                        if (elmSession.isConnected() && this.pollFailures < 3) {
+                            schedulePoll(1500L);
+                            return;
+                        }
                         connectionLost(elmSession);
-                        message(error(poll.failure));
+                        lost(error(poll.failure));
                         return;
                     }
+                    this.pollFailures = 0;
                     this.voltageOrigin = DataOrigin.VEHICLE;
                     this.voltage = poll.adapterVoltage == null ? "—" : String.format(Locale.getDefault(), "%.1f V", poll.adapterVoltage);
                     this.voltageTime = poll.voltageElapsedMillis;
@@ -1965,6 +2049,17 @@ public final class MainActivity extends Activity {
             text3 = historyOrigin == DataOrigin.SIMULATED ? "DADOS SIMULADOS" : "leituras OBD";
         }
         views.bind(dashboardState, list, text3, this.historySessionId, flag ? this.voltage : "—", string, text5);
+    }
+
+    private void lost(String text) {
+        if (this.destroyed) {
+            return;
+        }
+        AlertDialog.Builder builder = new LocalizedDialog(this).setTitle("Conexão perdida").setMessage(text).setNegativeButton("Fechar", null);
+        if (lastAdapterName() != null) {
+            builder.setPositiveButton("Reconectar", (dialog, which) -> reconnectLast());
+        }
+        builder.show();
     }
 
     private void connectionLost(ElmSession elmSession) {
