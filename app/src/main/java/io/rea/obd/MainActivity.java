@@ -158,10 +158,24 @@ public final class MainActivity extends Activity {
     private TextView scanView;
     private TextView statusView;
     private VehicleCatalogStore.Loaded vehicleCatalog;
+    private java.util.concurrent.Future<VehicleCatalogStore.Loaded> catalogLoad;
     private VehicleEfficiency efficiency;
 
+    private VehicleCatalogStore.Loaded catalog(boolean wait) {
+        java.util.concurrent.Future<VehicleCatalogStore.Loaded> load = this.catalogLoad;
+        if (this.vehicleCatalog == null && load != null && (wait || load.isDone())) {
+            try {
+                this.vehicleCatalog = load.get();
+            } catch (Exception e) {
+                this.vehicleCatalog = null;
+            }
+            this.catalogLoad = null;
+        }
+        return this.vehicleCatalog;
+    }
+
     private VehicleEfficiency.Official officialConsumption(VehicleProfile vehicle) {
-        if (vehicle == null || this.vehicleCatalog == null) {
+        if (vehicle == null || catalog(false) == null) {
             return null;
         }
         if (this.efficiency == null) {
@@ -278,11 +292,17 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             this.storageWarning = "Garagem indisponível: " + error(e) + ". Os dados originais foram preservados.";
         }
-        try {
-            this.vehicleCatalog = new VehicleCatalogStore(this).load();
-        } catch (Exception ignored) {
-            this.vehicleCatalog = null;
-        }
+        java.util.concurrent.FutureTask<VehicleCatalogStore.Loaded> catalogLoad = new java.util.concurrent.FutureTask<>(() -> {
+            VehicleCatalogStore.Loaded loaded = new VehicleCatalogStore(this).load();
+            this.ui.post(() -> {
+                if (!this.destroyed && this.page == 4) {
+                    render();
+                }
+            });
+            return loaded;
+        });
+        this.catalogLoad = catalogLoad;
+        new Thread(catalogLoad, "vehicle-catalog").start();
         try {
             this.historyStore = new DiagnosticHistoryStore(getPreferences(0));
             refreshHistory();
@@ -1161,7 +1181,7 @@ public final class MainActivity extends Activity {
             label(this.body, "Não foi possível carregar a garagem. Reinicie após verificar o armazenamento.", 14, this.AMBER, false);
         } else {
             VehicleRecord activeRecord = vehicleRepository.activeRecord();
-            GarageScreen.render(this.body, this.vehicles.records(), activeRecord == null ? "" : activeRecord.id, profileLocked(), this.vehicleCatalog, new GarageActions());
+            GarageScreen.render(this.body, this.vehicles.records(), activeRecord == null ? "" : activeRecord.id, profileLocked(), catalog(true), new GarageActions());
         }
     }
 
@@ -1438,7 +1458,7 @@ public final class MainActivity extends Activity {
             return;
         }
         try {
-            VehicleCatalogStore.Loaded loaded = this.vehicleCatalog;
+            VehicleCatalogStore.Loaded loaded = catalog(true);
             VehicleEditor vehicleEditor = new VehicleEditor(this, vehicleRecord, loaded == null ? null : loaded.catalog, new VehicleEditor.Save() {
                 @Override
                 public final void save(VehicleRecord vehicleRecord2, int i, VehicleCatalog vehicleCatalog) throws Exception {
@@ -2305,7 +2325,10 @@ public final class MainActivity extends Activity {
         if (this.demo) {
             message("SIMULAÇÃO: VIN fictício, não representa o veículo.");
         } else {
-            runRead("VIN e calibração", (obdReader) -> obdReader.vehicleInfo());
+            VehicleProfile profile = activeVehicle();
+            String make = profile == null ? null : profile.make;
+            Integer year = profile == null ? null : profile.year;
+            runRead("VIN e calibração", (obdReader) -> withVin(obdReader.vehicleInfo(), make, year));
         }
     }
 
@@ -2315,6 +2338,15 @@ public final class MainActivity extends Activity {
         } else {
             runRead("Quadro congelado · quadro 00", (obdReader) -> obdReader.freezeFrame());
         }
+    }
+
+    static String withVin(String info, String make, Integer year) {
+        if (!info.startsWith("VIN: ")) {
+            return info;
+        }
+        int end = info.indexOf('\n');
+        String extra = io.rea.obd.vehicle.VinDecoder.describe(info.substring(5, end < 0 ? info.length() : end), java.time.LocalDate.now().getYear(), make, year);
+        return extra.isEmpty() ? info : info + "\n" + extra;
     }
 
     private void runRead(String title, final ReadAction readAction) {

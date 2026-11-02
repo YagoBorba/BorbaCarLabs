@@ -123,6 +123,7 @@
   "Buffer BLE excedido; leitura não é completa": "BLE buffer exceeded; reading is not complete",
   "Busca Bluetooth LE. Um nome encontrado não comprova compatibilidade OBD.": "Bluetooth LE search. A name found does not prove OBD compatibility.",
   "Busca concluída · selecione um adaptador": "Search finished · select an adapter",
+  "Buscar meu carro": "Find my car",
   "Buscar nos seus perfis": "Search your profiles",
   "Byte de prontidão inválido": "Invalid readiness byte",
   "Cada campo de sintomas aceita até 2000 caracteres": "Each symptom field accepts up to 2000 characters",
@@ -175,6 +176,7 @@
   "COLETA E GRAVAÇÃO": "COLLECTION AND RECORDING",
   "Com que frequência?": "How often?",
   "Comando inválido": "Invalid command",
+  "Combina com o perfil ativo.": "Matches the active profile.",
   "Combustível": "Fuel",
   "Começar": "Start",
   "COMECE POR UMA CONEXÃO": "START WITH A CONNECTION",
@@ -354,6 +356,7 @@
   "Erro de programação do módulo de controle.": "Control module programming error.",
   "Erro na memória somente de leitura (ROM) do módulo de controle do trem de força.": "Powertrain control module read only memory (ROM) error.",
   "Erro no teste da memória mantida (KAM) do módulo de controle do trem de força.": "Powertrain control module keep alive memory (KAM) test error.",
+  "Escolha a versão do seu carro": "Choose your car's version",
   "Escolha marca, modelo e ano. Se não encontrar, você pode criar um perfil simples.": "Choose make, model and year. If you can't find it, you can create a simple profile.",
   "Escolha seu adaptador ELM327": "Choose your ELM327 adapter",
   "Escolha um modelo do catálogo ou crie um perfil simples.": "Pick a model from the catalog or create a simple profile.",
@@ -381,6 +384,7 @@
   "EVIDÊNCIA": "EVIDENCE",
   "Evidência de sessão sem contexto": "Session evidence without context",
   "Ex.: Meu carro": "E.g. My car",
+  "Ex.: onix 2019 lt": "E.g.: onix 2019 lt",
   "Excluir": "Delete",
   "Excluir caso e todas as revisões?": "Delete case and all revisions?",
   "Excluir esta investigação": "Delete this investigation",
@@ -397,7 +401,9 @@
   "Exportar JSON": "Export JSON",
   "Exportar relatório PDF": "Export PDF report",
   "Exportar último CSV": "Export last CSV",
+  "Extração da tabela (pdftotext -table) validada coluna a coluna, com rejeição de linhas ambíguas ou partidas": "Table extraction (pdftotext -table) checked column by column, rejecting ambiguous or split rows",
   "Fabricante": "Make",
+  "fabricante não reconhecido": "maker not recognized",
   "Faixa ou desempenho do circuito A do sensor de temperatura do combustível (EFT) fora do esperado.": "Fuel temperature (EFT) sensor A circuit range or performance out of range.",
   "Faixa ou desempenho do circuito B do sensor de temperatura do combustível (EFT) fora do esperado.": "Fuel temperature (EFT) sensor B circuit range or performance out of range.",
   "Faixa ou desempenho do circuito do sensor de detonação 1 (banco 1) fora do esperado.": "Knock sensor 1 circuit range or performance out of range (bank 1).",
@@ -612,6 +618,7 @@
   "Motor de regras: investigation-1 · catálogo generic-dtc-1 · evidência insuficiente para confirmar causa": "Rules engine: investigation-1 · catalog generic-dtc-1 · insufficient evidence to confirm a cause",
   "Motor e transmissão": "Powertrain",
   "Motor, câmbio ou mercado do veículo ainda não foram informados.": "Vehicle engine, transmission or market not provided yet.",
+  "Nada encontrado. Tente só o modelo ou escolha passo a passo.": "Nothing found. Try just the model or choose step by step.",
   "Não": "No",
   "Não anunciado pela ECU": "Not advertised by the ECU",
   "não associado": "not linked",
@@ -732,6 +739,7 @@
   "Os dados originais foram preservados.": "The original data was preserved.",
   "Os relatórios deste perfil serão removidos. Outros veículos não serão afetados.": "This profile's reports will be removed. Other vehicles will not be affected.",
   "Os relatórios e investigações serão preservados na seção de perfis removidos.": "Reports and investigations will be kept in the removed profiles section.",
+  "Ou escolha passo a passo": "Or choose step by step",
   "outro / misto": "other / mixed",
   "Outro / misto": "Other / mixed",
   "Outros": "Others",
@@ -1098,6 +1106,7 @@
   "Versão do histórico não reconhecida": "Unrecognized history version",
   "Versão documentada · escolha a sua": "Documented version · choose yours",
   "Versão e detalhes": "Version and details",
+  "Versão única": "Single version",
   "VIN e calibração": "VIN and calibration",
   "VIN inválido": "Invalid VIN",
   "VIN legado incompleto": "Incomplete legacy VIN",
@@ -1107,6 +1116,46 @@
   "Voltar ao diagnóstico": "Back to diagnosis"
  },
  "patterns": [
+  [
+   "O perfil ativo diz (.*)\\. Confira se é o mesmo carro\\.",
+   "The active profile says $1. Check that it is the same car."
+  ],
+  [
+   "ano-modelo (\\d{4})",
+   "model year $1"
+  ],
+  [
+   "Pelo VIN: (.+)",
+   "From the VIN: @1"
+  ],
+  [
+   "Base PBE Veicular (\\d+) a (\\d+) \\(Inmetro\\): (\\d+) versões de (\\d+) marcas com motor a combustão\\. Outros modelos podem ser cadastrados como perfil simples\\.",
+   "PBE Veicular $1 to $2 base (Inmetro): $3 versions from $4 makes with combustion engines. Other models can be added as a simple profile."
+  ],
+  [
+   "(\\d+) versões encontradas\\. Digite o ano ou a versão para refinar\\.",
+   "$1 versions found. Type the year or version to narrow it down."
+  ],
+  [
+   "Origem: (.+)",
+   "Source: @1"
+  ],
+  [
+   "PBE Veicular — Veículos leves (\\d{4}) a (\\d{4}) · Quilometragem por litro",
+   "PBE Veicular (Brazilian vehicle labeling program) — Light vehicles $1 to $2 · km per liter"
+  ],
+  [
+   "PBE Veicular — Veículos leves (\\d{4})",
+   "PBE Veicular (Brazilian vehicle labeling program) — Light vehicles $1"
+  ],
+  [
+   "(\\d{4}); recorte factual MY(\\d{2})",
+   "$1; factual MY$2 subset"
+  ],
+  [
+   "PDF, páginas 1 a (\\d+); (\\d+) linhas de motores a combustão extraídas em modo tabela e validadas coluna a coluna",
+   "PDF, pages 1 to $1; $2 combustion-engine rows extracted in table mode and checked column by column"
+  ],
   [
    "Escolher (.+)\\. (.+)",
    "Choose @1. @2"
@@ -1870,10 +1919,6 @@
   [
    "DTC: (.+)",
    "DTC: @1"
-  ],
-  [
-   "Origem: (.+)",
-   "Origin: @1"
   ],
   [
    "Antes: (.+)",
