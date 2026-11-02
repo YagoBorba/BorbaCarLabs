@@ -11,18 +11,20 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public final class VehicleCatalogJson {
-    public static final int MAX_BYTES = 2097152;
+    public static final int MAX_BYTES = 6291456;
 
     public static final class Parsed {
         private final byte[] bytes;
@@ -51,7 +53,8 @@ public final class VehicleCatalogJson {
                 byte[] byteArray = byteArrayOutputStream.toByteArray();
                 JSONObject json = new JSONObject(new String(byteArray, StandardCharsets.UTF_8));
                 keys(json, "schema_version", "catalog_version", "sequence", "coverage_note", "markets", "sources", "configurations");
-                if (VehicleRecordJson.integer(json, "schema_version") != 1) {
+                long schema = VehicleRecordJson.integer(json, "schema_version");
+                if (schema != 1 && schema != 2) {
                     throw new JSONException("Versão de catálogo não reconhecida");
                 }
                 String required = required(json, "catalog_version");
@@ -122,6 +125,9 @@ public final class VehicleCatalogJson {
                         byte[] bytes2 = byteArray;
                         LinkedHashMap map2 = new LinkedHashMap();
                         JSONArray configurations = json.getJSONArray("configurations");
+                        if (schema == 2) {
+                            return new Parsed(new VehicleCatalog(required, value2, required(json, "coverage_note"), strings, map, compact(configurations, strings, map, required)), bytes2);
+                        }
                         int value4 = 0;
                         while (value4 < configurations.length()) {
                             JSONObject jsonObject = configurations.getJSONObject(value4);
@@ -194,11 +200,63 @@ public final class VehicleCatalogJson {
                 }
             } else {
                 if (byteArrayOutputStream.size() + i > MAX_BYTES) {
-                    throw new IOException("Catálogo excede 2 MiB");
+                    throw new IOException("Catálogo excede 6 MiB");
                 }
                 byteArrayOutputStream.write(bytes, 0, i);
             }
         }
+    }
+
+    private static LinkedHashMap<String, VehicleCatalog.Configuration> compact(JSONArray configurations, Set<String> markets, Map<String, VehicleCatalog.Source> sources, String version) throws JSONException {
+        LinkedHashMap<String, VehicleCatalog.Configuration> result = new LinkedHashMap<>();
+        Map<String, List<String>> shared = new HashMap<>();
+        for (int i = 0; i < configurations.length(); i++) {
+            JSONObject json = configurations.getJSONObject(i);
+            keys(json, "id", "market", "source_id", "section", "values");
+            String id = required(json, "id");
+            String market = required(json, "market");
+            String sourceId = required(json, "source_id");
+            String section = required(json, "section");
+            VehicleCatalog.Source source = sources.get(sourceId);
+            if (!markets.contains(market)) {
+                throw new JSONException("Configuração fora do mercado publicado");
+            }
+            if (source == null || !source.permission.equals("APPROVED_EMBEDDED_FACTS") || !source.markets.contains(market)) {
+                throw new JSONException("Atributo sem fonte aprovada e aplicável ao mercado/campo");
+            }
+            List<String> fixed = shared.get(sourceId);
+            if (fixed == null) {
+                fixed = Arrays.asList("Documento: " + source.title, "Editor: " + source.publisher, "Localização: " + source.url, "Consulta: " + source.accessedOn, "Permissão declarada: " + source.permission + " · " + source.permissionReference, "Revisão de origem declarada: " + source.reviewedBy + " · " + source.reviewedOn);
+                shared.put(sourceId, fixed);
+            }
+            List<String> references = Arrays.asList(version + "/" + sourceId + "/" + source.documentVersion + "/" + section, fixed.get(0), fixed.get(1), fixed.get(2), "Seção: " + section, fixed.get(3), fixed.get(4), fixed.get(5));
+            FactProvenance provenance = new FactProvenance(FactProvenance.Origin.CATALOG, FactProvenance.Verification.DOCUMENTED, references, market + "/" + id, "", null);
+            EnumMap<VehicleAttribute.Key, VehicleAttribute> attributes = new EnumMap<>(VehicleAttribute.Key.class);
+            JSONObject values = json.getJSONObject("values");
+            for (Iterator<String> names = values.keys(); names.hasNext(); ) {
+                String name = names.next();
+                VehicleAttribute.Key key = VehicleAttribute.Key.valueOf(name);
+                if (key == VehicleAttribute.Key.NOTES) {
+                    throw new JSONException("Anotação do usuário não pertence ao catálogo");
+                }
+                if (!source.fields.contains(key)) {
+                    throw new JSONException("Atributo sem fonte aprovada e aplicável ao mercado/campo");
+                }
+                attributes.put(key, new VehicleAttribute(key, required(values, name), provenance));
+            }
+            for (VehicleAttribute.Key key : new VehicleAttribute.Key[]{VehicleAttribute.Key.MAKE, VehicleAttribute.Key.MODEL, VehicleAttribute.Key.MARKET}) {
+                if (!attributes.containsKey(key)) {
+                    throw new JSONException("Configuração sem identidade/mercado documentado");
+                }
+            }
+            if (!attributes.get(VehicleAttribute.Key.MARKET).value.equals(market)) {
+                throw new JSONException("Mercado do atributo divergente");
+            }
+            if (result.put(id, new VehicleCatalog.Configuration(id, market, attributes)) != null) {
+                throw new JSONException("Configuração duplicada");
+            }
+        }
+        return result;
     }
 
     public static void keys(JSONObject json, String... text) throws JSONException {
