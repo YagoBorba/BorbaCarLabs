@@ -1,5 +1,6 @@
 {
  "exact": {
+  "○ DESCONECTADO": "○ OFFLINE",
   "● CONECTADO": "● CONNECTED",
   "1 de 2 · consultando códigos e indicador de emissões": "1 of 2 · reading codes and emissions indicator",
   "1 falha indicada": "1 fault reported",
@@ -119,6 +120,7 @@
   "Automático": "Automatic",
   "Automático (idioma do sistema)": "Automatic (system language)",
   "Automatizado": "Automated manual",
+  "Avançado": "Advanced",
   "Avanço de ignição": "Ignition timing advance",
   "baixa": "low",
   "Barulho estranho": "Strange noise",
@@ -264,6 +266,7 @@
   "Confirme um intervalo somente ao completar o tanque.": "Confirm an interval only when filling the tank.",
   "conforme capturas do veículo": "as captured from the vehicle",
   "Conforme o lembrete registrado no Diário.": "As set by the reminder in the Journal.",
+  "Conheça o app com dados fictícios, sem adaptador.": "Try the app with fictional data, no adapter needed.",
   "Conjunto de atributos incompleto ou desconhecido": "Incomplete or unknown attribute set",
   "Consulta executada precisa de horários": "A query that ran needs timestamps",
   "Consulta feita ao exportar; não integra a análise salva acima.": "Lookup done at export time; not part of the saved analysis above.",
@@ -1179,6 +1182,7 @@
   "Usar tema do sistema": "Use system theme",
   "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.": "Use with the vehicle stopped. Unavailable queries will remain marked as such.",
   "Use uma data e horário já ocorridos para registrar o acontecimento.": "Use a date and time that already happened to log the event.",
+  "Uso do dia a dia": "Everyday use",
   "válida na captura": "valid in the capture",
   "Validação física exige configuração e Android identificados": "Physical validation requires identified configuration and Android",
   "Valor de quadro inválido": "Invalid freeze frame value",

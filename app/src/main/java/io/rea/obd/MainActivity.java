@@ -620,7 +620,7 @@ public final class MainActivity extends Activity {
         if (this.demo) {
             text = "DEMONSTRAÇÃO";
         } else {
-            text = connected() ? "● CONECTADO" : "○ OFFLINE";
+            text = connected() ? "● CONECTADO" : "○ DESCONECTADO";
         }
         if (this.demo) {
             i = this.AMBER;
@@ -782,7 +782,7 @@ public final class MainActivity extends Activity {
         } else {
             StringBuilder builder = new StringBuilder();
             builder.append(json.optString("date", "Horário não informado"));
-            builder.append(json.optBoolean("demo") ? " · SIMULADO" : " · origem conforme registro");
+            builder.append(json.optBoolean("demo") ? " · SIMULADO" : "");
             string = builder.toString();
         }
         DtcReadResult lastRead = null;
@@ -1305,11 +1305,29 @@ public final class MainActivity extends Activity {
     private void more() {
         String text;
         heading("BORBACAR LABS", "Ajustes", "");
-        button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
-        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
+        UiKit kit = new UiKit(this);
+        kit.section(this.body, "Demonstração", "Conheça o app com dados fictícios, sem adaptador.");
+        button(this.body, this.demo ? "Sair da demonstração" : "Ativar demonstração", false, () -> {
+            if (this.demo) {
+                disconnect();
+            } else {
+                startDemo();
+            }
+            this.page = 0;
+            render();
+        });
+        kit.section(this.body, "Uso do dia a dia", "");
         button(this.body, ReminderReceiver.enabled(this) ? "Lembretes de manutenção: ligados" : "Lembretes de manutenção: desligados", false, () -> toggleReminders());
-        button(this.body, "Aparência", false, () -> this.chooseAppearance());
+        if (ThemePalette.LIGHT.equals(ThemePalette.preference(this))) {
+            text = "Claro";
+        } else {
+            text = ThemePalette.DARK.equals(ThemePalette.preference(this)) ? "Escuro" : "Sistema";
+        }
+        button(this.body, "Tema: " + text, false, () -> this.chooseAppearance());
         button(this.body, "Idioma: " + languageName(I18n.preference(this)), false, () -> this.chooseLanguage());
+        kit.section(this.body, "Avançado", "");
+        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
+        button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
                         + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas. "
@@ -1323,31 +1341,12 @@ public final class MainActivity extends Activity {
                 message("Não foi possível salvar a preferência.");
             }
         });
-        LinearLayout linearLayout = this.body;
-        StringBuilder builder = new StringBuilder("Tema: ");
-        if (ThemePalette.LIGHT.equals(ThemePalette.preference(this))) {
-            text = "Claro";
-        } else {
-            text = ThemePalette.DARK.equals(ThemePalette.preference(this)) ? "Escuro" : "Sistema";
-        }
-        builder.append(text);
-        builder.append(" · altere com a aquisição encerrada.");
-        label(linearLayout, builder.toString(), 13, this.MUTED, false);
         LinearLayout disclosure = new UiKit(this).disclosure(this.body, "Sobre e referências");
         label(disclosure, "SOBRE ESTA VERSÃO", 12, this.ACCENT, true);
         gap(disclosure, 8);
         label(disclosure, "BorbaCar Labs · " + appVersion() + "\nAndroid 8 ou superior\nArmazenamento local · sem conta e sem envio de dados", 14, this.TEXT, false);
         gap(disclosure, 10);
         label(disclosure, "A conexão e as leituras reais precisam ser validadas em um adaptador e veículo. Use o modo de demonstração para conhecer a interface.", 13, this.MUTED, false);
-        button(this.body, this.demo ? "Sair da demonstração" : "Ativar demonstração", false, () -> {
-            if (this.demo) {
-                disconnect();
-            } else {
-                startDemo();
-            }
-            this.page = 0;
-            render();
-        });
         button(disclosure, "Fontes de protocolo", false, () -> {
             ArrayList items = new ArrayList();
             Iterator<SourceReference> it = KnowledgeRepository.all().iterator();

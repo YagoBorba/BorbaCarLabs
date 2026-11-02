@@ -205,7 +205,7 @@ public final class JournalEditor {
             text2 = "Corrigir registro";
         }
         uiKit.label(column2, text2, 24, UiKit.TEXT, true);
-        uiKit.label(column2, vehicleName + " · informado por você", 14, UiKit.MUTED, false);
+        uiKit.label(column2, vehicleName, 14, UiKit.MUTED, false);
         Button button = uiKit.button(column2, "", false, () -> this.pickDate());
         this.dateButton = button;
         button.setTag("journal-date");
