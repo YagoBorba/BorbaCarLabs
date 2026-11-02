@@ -14,9 +14,12 @@ public final class ConnectionScreen {
         void paired();
 
         void wifi();
+
+        default void last() {
+        }
     }
 
-    public static void show(Activity activity, final Actions actions) {
+    public static void show(Activity activity, String lastName, final Actions actions) {
         UiKit uiKit = new UiKit(activity);
         LinearLayout column = uiKit.column();
         column.setPadding(uiKit.dp(20), uiKit.dp(16), uiKit.dp(20), uiKit.dp(12));
@@ -25,7 +28,14 @@ public final class ConnectionScreen {
         uiKit.label(column, "Android " + Build.VERSION.RELEASE + " · API " + Build.VERSION.SDK_INT, 13, UiKit.MUTED, false);
         uiKit.label(column, "Conecte o scanner ao carro e escolha onde procurar. O app solicita as permissões necessárias e consulta as respostas do dispositivo escolhido.", 15, UiKit.TEXT, false);
         final AlertDialog alertDialog = new LocalizedDialog(activity).setTitle("Encontrar meu scanner").setNegativeButton("Cancelar", null).create();
-        uiKit.button(column, "Ver dispositivos pareados", true, () -> {
+        if (lastName != null) {
+            uiKit.button(column, "Reconectar · " + lastName, true, () -> {
+                alertDialog.dismiss();
+                actions.last();
+            }).setTag("connect-last");
+            uiKit.label(column, "Último adaptador que respondeu neste aparelho.", 12, UiKit.MUTED, false);
+        }
+        uiKit.button(column, "Ver dispositivos pareados", lastName == null, () -> {
             alertDialog.dismiss();
             actions.paired();
         });
