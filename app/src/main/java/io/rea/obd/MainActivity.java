@@ -373,6 +373,14 @@ public final class MainActivity extends Activity {
             }
 
             @Override
+            public void offerReminders() {
+                if (MainActivity.this.destroyed || ReminderReceiver.enabled(MainActivity.this)) {
+                    return;
+                }
+                new LocalizedDialog(MainActivity.this).setTitle("Ligar lembretes?").setMessage("O app avisa quando faltarem 7 dias ou 500 km para o próximo serviço. Você pode mudar isso em Ajustes.").setPositiveButton("Ligar lembretes", (dialog, which) -> MainActivity.this.toggleReminders()).setNegativeButton("Agora não", null).show();
+            }
+
+            @Override
             public Set<String> vehicleIds() {
                 HashSet seen = new HashSet();
                 if (MainActivity.this.vehicles != null) {
@@ -797,6 +805,14 @@ public final class MainActivity extends Activity {
             @Override
             public void journal() {
                 MainActivity.this.navigate(NavigationState.JOURNAL);
+            }
+
+            @Override
+            public void fuel() {
+                MainActivity.this.navigate(NavigationState.JOURNAL);
+                if (MainActivity.this.journal != null) {
+                    MainActivity.this.journal.add(io.rea.obd.journal.JournalEntry.Kind.FUEL);
+                }
             }
         });
         if (this.caseWarning.isEmpty()) {

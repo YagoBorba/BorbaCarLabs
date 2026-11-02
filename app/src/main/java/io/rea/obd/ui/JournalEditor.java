@@ -69,6 +69,24 @@ public final class JournalEditor {
     private final String vehicleId;
     private final String vehicleName;
 
+    public static final class Defaults {
+        public final BigDecimal odometer;
+        public final long odometerAt;
+        public final String fuel;
+
+        public Defaults(BigDecimal odometer, long odometerAt, String fuel) {
+            this.odometer = odometer;
+            this.odometerAt = odometerAt;
+            this.fuel = fuel;
+        }
+    }
+
+    private static final String[] SERVICES = {"Troca de óleo e filtro", "Revisão", "Rodízio de pneus", "Alinhamento e balanceamento", "Troca de pneus", "Pastilhas de freio", "Filtro de ar", "Filtro de cabine", "Velas de ignição", "Bateria", "Correia dentada", "Fluido de freio", "Arrefecimento"};
+    private static final String[] SYMPTOMS = {"Luz de injeção acesa", "Luz de injeção piscando", "Dificuldade para ligar", "Marcha lenta irregular", "Falha ou tranco ao acelerar", "Perda de força", "Consumo alto", "Temperatura alta", "Barulho estranho", "Cheiro de combustível", "Fumaça no escapamento", "Bateria fraca"};
+
+    private final Defaults defaults;
+    private TextView computed;
+
     public interface Completion {
         void complete(String text);
     }
@@ -77,7 +95,7 @@ public final class JournalEditor {
         void save(JournalEntry journalEntry, Completion completion);
     }
 
-    public JournalEditor(Activity activity, VehicleProfile vehicleProfile, JournalEntry.Kind kind, JournalEntry journalEntry, Bundle bundle, Save save) throws Exception {
+    public JournalEditor(Activity activity, VehicleProfile vehicleProfile, JournalEntry.Kind kind, JournalEntry journalEntry, Bundle bundle, Defaults defaults, Save save) throws Exception {
         JournalEntry.Kind kind2;
         String string;
         String vehicleId;
@@ -99,6 +117,7 @@ public final class JournalEditor {
         boolean checked3;
         String decimal4;
         this.dueDate = "";
+        this.defaults = defaults;
         this.host = activity;
         this.save = save;
         UiKit uiKit = new UiKit(activity);
@@ -195,7 +214,7 @@ public final class JournalEditor {
         if (kind2 == JournalEntry.Kind.FUEL) {
             text3 = "Observação (opcional)";
         } else {
-            text3 = "O que aconteceu ou foi feito?";
+            text3 = kind2 == JournalEntry.Kind.SERVICE ? "O que foi feito?" : "O que você percebeu?";
         }
         String title = text3;
         if (original == null) {
@@ -203,7 +222,10 @@ public final class JournalEditor {
         } else {
             serverUrl = original.note;
         }
-        field(column2, "note", title, serverUrl, bundle, false, 2000).setSingleLine(false);
+        if (kind2 != JournalEntry.Kind.FUEL) {
+            field(column2, "note", title, serverUrl, bundle, false, 2000).setSingleLine(false);
+            uiKit.button(column2, kind2 == JournalEntry.Kind.SERVICE ? "Escolher serviço comum" : "Escolher sintoma comum", false, () -> this.suggest(kind2 == JournalEntry.Kind.SERVICE ? SERVICES : SYMPTOMS)).setTag("journal-suggest");
+        }
         if (kind2 == JournalEntry.Kind.FUEL) {
             text4 = "";
         } else {
@@ -215,13 +237,16 @@ public final class JournalEditor {
         } else {
             decimal = decimal(original.odometer);
         }
-        field(column2, "odometer", concat, decimal, bundle, true, 32);
-        if (kind2 != JournalEntry.Kind.SYMPTOM) {
-            if (original == null) {
-                decimal4 = "";
-            } else {
-                decimal4 = decimal(original.cost);
-            }
+        EditText odometer = field(column2, "odometer", concat, decimal, bundle, true, 32);
+        if (original == null && defaults != null && defaults.odometer != null) {
+            odometer.setHint(I18n.t("Último registro: " + Format.km(defaults.odometer)));
+        }
+        if (original == null) {
+            decimal4 = "";
+        } else {
+            decimal4 = decimal(original.cost);
+        }
+        if (kind2 == JournalEntry.Kind.SERVICE) {
             field(column2, "cost", "Valor total pago (R$) · opcional", decimal4, bundle, true, 32);
         }
         if (kind2 == JournalEntry.Kind.FUEL) {
@@ -231,13 +256,22 @@ public final class JournalEditor {
                 decimal3 = decimal(original.liters);
             }
             field(column2, "liters", "Litros abastecidos", decimal3, bundle, true, 32);
+            field(column2, "price", "Preço por litro (R$) · opcional", original == null || original.cost == null || original.liters == null || original.liters.signum() == 0 ? "" : decimal(original.cost.divide(original.liters, 3, java.math.RoundingMode.HALF_UP).stripTrailingZeros()), bundle, true, 32);
+            field(column2, "cost", "Valor total pago (R$) · opcional", decimal4, bundle, true, 32);
+            this.computed = uiKit.label(column2, "", 13, UiKit.MUTED, false);
+            this.computed.setTag("journal-computed");
+            updateComputed();
             TextView label = uiKit.label(column2, "Combustível", 14, UiKit.TEXT, true);
             Spinner spinner = new Spinner(activity);
             this.fuel = spinner;
             spinner.setId(View.generateViewId());
             label.setLabelFor(this.fuel.getId());
             this.fuel.setTag("journal-fuel");
-            ArrayAdapter arrayAdapter = new ArrayAdapter(activity, android.R.layout.simple_spinner_item, JournalEntry.FUELS);
+            java.util.List<String> fuelLabels = new java.util.ArrayList<>();
+            for (String option : JournalEntry.FUELS) {
+                fuelLabels.add(I18n.t(option));
+            }
+            ArrayAdapter arrayAdapter = new ArrayAdapter(activity, android.R.layout.simple_spinner_item, fuelLabels);
             arrayAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             this.fuel.setAdapter((SpinnerAdapter) arrayAdapter);
             this.fuel.setMinimumHeight(uiKit.dp(48));
@@ -247,7 +281,7 @@ public final class JournalEditor {
             if (bundle != null) {
                 indexOf = Math.max(0, Math.min(JournalEntry.FUELS.size() - 1, bundle.getInt("fuel")));
             } else if (original == null) {
-                indexOf = 0;
+                indexOf = defaults == null ? 0 : Math.max(0, JournalEntry.FUELS.indexOf(defaults.fuel));
             } else {
                 indexOf = JournalEntry.FUELS.indexOf(original.fuel);
             }
@@ -263,17 +297,15 @@ public final class JournalEditor {
             } else {
                 checked3 = original != null && original.completeInterval;
             }
-            CheckBox complete = check(linearLayout, "Registrei todos os abastecimentos desde o tanque cheio anterior", "journal-complete", checked3);
+            CheckBox complete = check(linearLayout, "Registrei todos os abastecimentos desde o último tanque cheio", "journal-complete", checked3);
             this.complete = complete;
             complete.setEnabled(this.full.isChecked());
             this.full.setOnCheckedChangeListener((button2, checked) -> {
                 this.complete.setEnabled(checked);
-                if (checked) {
-                    return;
-                }
-                this.complete.setChecked(false);
+                this.complete.setChecked(checked);
             });
-            uiKit.label(linearLayout, "Um registro parcial entra na soma do intervalo. Sem confirmação de completude, o app não calcula a média.", 13, UiKit.MUTED, false);
+            uiKit.label(linearLayout, "O consumo é calculado de um tanque cheio ao outro. Abastecimentos parciais entram na soma.", 13, UiKit.MUTED, false);
+            field(linearLayout, "note", title, serverUrl, bundle, false, 2000).setSingleLine(false);
         } else {
             linearLayout = column2;
         }
@@ -353,10 +385,51 @@ public final class JournalEditor {
                 if (JournalEditor.this.error != null) {
                     JournalEditor.this.error.setText("");
                 }
+                JournalEditor.this.updateComputed();
             }
         });
         this.fields.put(text, input);
         return input;
+    }
+
+    void suggest(String[] options) {
+        String[] labels = new String[options.length];
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = I18n.t(options[i]);
+        }
+        new LocalizedDialog(this.host).setTitle(this.kind == JournalEntry.Kind.SERVICE ? "Serviço comum" : "Sintoma comum").setItems(labels, (dialog, which) -> {
+            EditText note = this.fields.get("note");
+            String current = note.getText().toString().trim();
+            note.setText(current.isEmpty() ? labels[which] : current + "; " + labels[which]);
+            note.setSelection(note.getText().length());
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    private static BigDecimal number(String text) {
+        try {
+            return JournalEntry.decimal(text, 3);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    void updateComputed() {
+        if (this.computed == null) {
+            return;
+        }
+        BigDecimal liters = number(value("liters"));
+        BigDecimal price = number(value("price"));
+        BigDecimal cost = number(value("cost"));
+        String text = "";
+        if (liters != null && price != null && cost == null && liters.signum() > 0) {
+            text = "Total calculado: " + Format.money(liters.multiply(price).setScale(2, java.math.RoundingMode.HALF_UP));
+        } else if (cost != null && price != null && liters == null && price.signum() > 0) {
+            text = "Litros calculados: " + Format.decimal(cost.divide(price, 2, java.math.RoundingMode.HALF_UP)) + " L";
+        } else if (cost != null && liters != null && price == null && liters.signum() > 0) {
+            text = "Preço por litro: " + Format.money(cost.divide(liters, 2, java.math.RoundingMode.HALF_UP));
+        }
+        this.computed.setText(I18n.t(text));
+        this.computed.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     private CheckBox check(LinearLayout linearLayout, String text, String tag, boolean checked) {
@@ -451,6 +524,15 @@ public final class JournalEditor {
             BigDecimal decimal = JournalEntry.decimal(value("odometer"), 3);
             BigDecimal decimal2 = JournalEntry.decimal(value("liters"), 3);
             BigDecimal decimal3 = JournalEntry.decimal(value("cost"), 2);
+            BigDecimal price = JournalEntry.decimal(value("price"), 3);
+            if (price != null && decimal3 == null && decimal2 != null) {
+                decimal3 = decimal2.multiply(price).setScale(2, java.math.RoundingMode.HALF_UP);
+            } else if (price != null && decimal2 == null && decimal3 != null && price.signum() > 0) {
+                decimal2 = decimal3.divide(price, 3, java.math.RoundingMode.HALF_UP);
+            }
+            if (this.original == null && decimal != null && this.defaults != null && this.defaults.odometer != null && this.occurrence >= this.defaults.odometerAt && decimal.compareTo(this.defaults.odometer) < 0) {
+                throw new IllegalArgumentException("O hodômetro está menor que o último registro (" + Format.km(this.defaults.odometer) + "). Confira o valor.");
+            }
             String fuel = this.fuel == null ? "" : JournalEntry.FUELS.get(this.fuel.getSelectedItemPosition());
             CheckBox checkBox = this.full;
             boolean full = checkBox != null && checkBox.isChecked();
