@@ -71,8 +71,10 @@ public final class JournalController {
         public final FuelSummary fuel;
         public final JournalEntry reminder;
         public final String lastFuel;
+        public final BigDecimal odometer;
 
-        Glance(int count, FuelSummary fuel, JournalEntry reminder, String lastFuel) {
+        Glance(int count, FuelSummary fuel, JournalEntry reminder, String lastFuel, BigDecimal odometer) {
+            this.odometer = odometer;
             this.count = count;
             this.fuel = fuel;
             this.reminder = reminder;
@@ -90,16 +92,20 @@ public final class JournalController {
         }
         int count = 0;
         JournalEntry lastFill = null;
+        BigDecimal odometer = null;
         for (JournalEntry entry : this.entries) {
             if (!entry.vehicleId.equals(vehicle.id) || entry.voided) {
                 continue;
             }
             count++;
+            if (entry.odometer != null && (odometer == null || entry.odometer.compareTo(odometer) > 0)) {
+                odometer = entry.odometer;
+            }
             if (entry.kind == JournalEntry.Kind.FUEL && (lastFill == null || entry.occurredAt > lastFill.occurredAt)) {
                 lastFill = entry;
             }
         }
-        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id), lastFill == null ? "" : lastFill.fuel);
+        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id), lastFill == null ? "" : lastFill.fuel, odometer);
     }
 
     public interface Host {

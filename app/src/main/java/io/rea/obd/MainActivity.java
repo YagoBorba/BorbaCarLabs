@@ -1386,16 +1386,19 @@ public final class MainActivity extends Activity {
     }
 
     public void chooseAppearance() {
-        if (profileLocked()) {
-            message("Encerre a conexão, demonstração e gravação antes de mudar o tema. Isso preserva sua sessão atual.");
+        if (connected() || this.busy || this.recorder != null) {
+            message("Encerre a conexão e a gravação antes de mudar o tema. Isso preserva sua sessão atual.");
             return;
         }
         final String[] parts = {ThemePalette.SYSTEM, ThemePalette.LIGHT, ThemePalette.DARK};
         final String preference = ThemePalette.preference(this);
         final int[] values = {Arrays.asList(parts).indexOf(preference)};
         new LocalizedDialog(this).setTitle("Aparência").setSingleChoiceItems(new String[]{"Usar tema do sistema", "Claro", "Escuro"}, values[0], (dialog, which) -> values[0] = which).setNegativeButton("Cancelar", null).setPositiveButton("Aplicar", (dialog, which) -> {
-            if (profileLocked() || preference.equals(parts[values[0]])) {
+            if (connected() || this.busy || this.recorder != null || preference.equals(parts[values[0]])) {
                 return;
+            }
+            if (this.demo) {
+                disconnect();
             }
             if (ThemePalette.save(this, parts[values[0]])) {
                 recreate();
