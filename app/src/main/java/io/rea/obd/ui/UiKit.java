@@ -89,7 +89,9 @@ public final class UiKit {
     }
 
     public void eyebrow(LinearLayout linearLayout, String category) {
-        label(linearLayout, category, 11, ACCENT, true).setLetterSpacing(0.12f);
+        TextView eyebrow = label(linearLayout, category, 11, ACCENT, true);
+        eyebrow.setLetterSpacing(0.12f);
+        eyebrow.setAllCaps(true);
     }
 
     public LinearLayout feature(LinearLayout linearLayout) {
