@@ -83,7 +83,7 @@ public final class DashboardState {
             if (value < 0) {
                 text2 = " · idade indisponível";
             } else {
-                text2 = " · há " + (value / 1000) + " s";
+                text2 = value < 1000 ? " · agora" : " · há " + (value / 1000) + " s";
             }
             builder.append(text2);
             this.time = builder.toString();

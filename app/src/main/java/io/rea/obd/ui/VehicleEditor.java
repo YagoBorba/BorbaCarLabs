@@ -25,11 +25,16 @@ import io.rea.obd.vehicle.VehiclePresentation;
 import io.rea.obd.vehicle.VehicleRecord;
 import io.rea.obd.vehicle.VehicleRecordJson;
 import io.rea.obd.vehicle.catalog.VehicleCatalog;
+import io.rea.obd.vehicle.catalog.VehicleSearch;
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import org.json.JSONObject;
 
@@ -48,6 +53,7 @@ public final class VehicleEditor {
     private int step;
     private final UiKit ui;
     private String warning = "";
+    private String query = "";
 
     public interface Save {
         void save(VehicleRecord vehicleRecord, int i, VehicleCatalog vehicleCatalog) throws Exception;
@@ -168,7 +174,12 @@ public final class VehicleEditor {
         }
         int i = this.step;
         if (i == 0) {
-            this.ui.label(this.content, "Escolha marca, modelo e ano. Se não encontrar, você pode criar um perfil simples.", 15, UiKit.MUTED, false);
+            if (this.catalog != null) {
+                search();
+                this.ui.label(this.content, "Ou escolha passo a passo", 13, UiKit.MUTED, true);
+            } else {
+                this.ui.label(this.content, "Escolha marca, modelo e ano. Se não encontrar, você pode criar um perfil simples.", 15, UiKit.MUTED, false);
+            }
             field(VehicleAttribute.Key.MAKE);
             field(VehicleAttribute.Key.MODEL);
             field(VehicleAttribute.Key.MODEL_YEAR);
@@ -201,14 +212,15 @@ public final class VehicleEditor {
                 this.ui.label(this.content, "Sem versão documentada para esta seleção. Você pode salvar um perfil parcial.", 13, UiKit.MUTED, false);
             }
             VehicleAttribute.Key[] keys = {VehicleAttribute.Key.TRIM, VehicleAttribute.Key.ENGINE, VehicleAttribute.Key.TRANSMISSION, VehicleAttribute.Key.FUEL_TYPE};
+            List<VehicleAttribute> chosen = new ArrayList<>();
             for (int i2 = 0; i2 < 4; i2++) {
-                VehicleAttribute.Key key = keys[i2];
-                VehicleAttribute attribute = this.draft.attribute(key);
+                VehicleAttribute attribute = this.draft.attribute(keys[i2]);
                 if (attribute.value != null) {
-                    this.ui.label(this.content, VehiclePresentation.title(key) + " · " + attribute.value, 16, UiKit.TEXT, true);
-                    this.ui.label(this.content, VehiclePresentation.compactOrigin(attribute), 12, UiKit.MUTED, false);
+                    this.ui.label(this.content, VehiclePresentation.title(keys[i2]) + " · " + attribute.value, 16, UiKit.TEXT, true);
+                    chosen.add(attribute);
                 }
             }
+            origins(chosen);
             this.ui.row(this.content, this.detailsExpanded ? "Ocultar detalhes opcionais" : "Outros detalhes (opcional)", () -> {
                 this.detailsExpanded = !this.detailsExpanded;
                 render();
@@ -223,18 +235,19 @@ public final class VehicleEditor {
             VehicleRecord vehicleRecord = this.draft.result();
             this.ui.label(this.content, vehicleRecord.name, 24, UiKit.TEXT, true);
             int value7 = 0;
+            List<VehicleAttribute> filled = new ArrayList<>();
             for (VehicleAttribute vehicleAttribute : vehicleRecord.attributes().values()) {
                 if (vehicleAttribute.value == null) {
                     value7++;
                 } else {
                     this.ui.label(this.content, VehiclePresentation.title(vehicleAttribute.key) + " · " + vehicleAttribute.value, 16, UiKit.TEXT, true);
-                    this.ui.label(this.content, VehiclePresentation.compactOrigin(vehicleAttribute), 12, UiKit.MUTED, false);
+                    filled.add(vehicleAttribute);
                 }
             }
+            origins(filled);
             if (value7 > 0) {
                 this.ui.label(this.content, "Detalhes não preenchidos continuam em branco. Você pode completar depois.", 13, UiKit.MUTED, false);
             }
-            this.ui.label(this.content, "A versão é escolhida por você. Dados de catálogo não identificam o carro nem comprovam suporte OBD.", 13, UiKit.MUTED, false);
             LinearLayout disclosure = this.ui.disclosure(this.content, "Ver fontes e identificação completa");
             Iterator<String> it = VehiclePresentation.report(vehicleRecord).iterator();
             while (it.hasNext()) {
@@ -249,6 +262,7 @@ public final class VehicleEditor {
         final Dialog dialog = this.dialog;
         Objects.requireNonNull(dialog);
         ui.button(column, "Cancelar", false, () -> dialog.dismiss());
+        I18n.apply(column);
     }
 
     void updatePreview() {
@@ -261,6 +275,9 @@ public final class VehicleEditor {
                 }
                 VehicleDraft vehicleDraft = this.draft;
                 StringBuilder builder = new StringBuilder();
+                if (this.draft.attribute(VehicleAttribute.Key.MAKE).value != null) {
+                    builder.append(this.draft.attribute(VehicleAttribute.Key.MAKE).value).append(' ');
+                }
                 builder.append(text2);
                 if (this.draft.attribute(VehicleAttribute.Key.MODEL_YEAR).value == null) {
                     text = "";
@@ -297,16 +314,88 @@ public final class VehicleEditor {
                 enumMap.put(key, this.draft.attribute(key).value);
             }
         }
-        return this.catalog.matching(enumMap);
+        Collator collator = Collator.getInstance(new Locale("pt", "BR"));
+        List<VehicleCatalog.Configuration> found = new ArrayList<>(this.catalog.matching(enumMap));
+        found.sort(Comparator.comparing((VehicleCatalog.Configuration c) -> c.attributes.get(VehicleAttribute.Key.MODEL_YEAR) == null ? "" : c.attributes.get(VehicleAttribute.Key.MODEL_YEAR).value, Comparator.reverseOrder())
+                .thenComparing(c -> VehicleSearch.details(c, false), collator));
+        return found;
+    }
+
+    private void origins(List<VehicleAttribute> attributes) {
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        for (VehicleAttribute attribute : attributes) {
+            seen.add(VehiclePresentation.compactOrigin(attribute));
+        }
+        if (!seen.isEmpty()) {
+            this.ui.label(this.content, "Origem: " + String.join(" · ", seen), 12, UiKit.MUTED, false);
+        }
+    }
+
+    private void search() {
+        EditText query = this.ui.input(this.content, "Buscar meu carro", this.query, "vehicle-search");
+        query.setHint("Ex.: onix 2019 lt");
+        query.setSingleLine(true);
+        LinearLayout results = this.ui.column();
+        this.content.addView(results);
+        showResults(results, this.query);
+        query.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void afterTextChanged(Editable editable) {
+                VehicleEditor.this.query = editable.toString();
+                VehicleEditor.this.showResults(results, VehicleEditor.this.query);
+            }
+
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int value, int value2, int value3) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int value, int value2, int value3) {
+            }
+        });
+    }
+
+    void showResults(LinearLayout results, String text) {
+        results.removeAllViews();
+        if (VehicleSearch.normalize(text).length() < 2) {
+            return;
+        }
+        VehicleSearch.Result result = VehicleSearch.search(this.catalog, text, 8);
+        if (result.total == 0) {
+            this.ui.label(results, "Nada encontrado. Tente só o modelo ou escolha passo a passo.", 13, UiKit.MUTED, false);
+        }
+        for (VehicleCatalog.Configuration configuration : result.matches) {
+            View row = this.ui.row(results, VehicleSearch.headline(configuration) + "\n" + VehicleSearch.details(configuration, false), () -> {
+                try {
+                    this.draft.selectConfiguration(this.catalog, configuration.id);
+                    if (this.draft.name.trim().isEmpty()) {
+                        this.draft.name = VehicleSearch.headline(configuration);
+                    }
+                    this.query = "";
+                    this.warning = "";
+                    this.step = 2;
+                    render();
+                } catch (Exception e) {
+                    this.warning = e.getMessage();
+                    render();
+                }
+            });
+            row.setTag("vehicle-result-" + configuration.id);
+        }
+        if (result.total > result.matches.size()) {
+            this.ui.label(results, result.total + " versões encontradas. Digite o ano ou a versão para refinar.", 12, UiKit.MUTED, false);
+        }
+        I18n.apply(results);
     }
 
     public void configurationPicker() {
         final List<VehicleCatalog.Configuration> configurations = configurations();
         ArrayList items = new ArrayList();
         Iterator<VehicleCatalog.Configuration> it = configurations.iterator();
+        boolean withYear = this.draft.attribute(VehicleAttribute.Key.MODEL_YEAR).value == null;
         while (true) {
             if (!it.hasNext()) {
-                new LocalizedDialog(this.activity).setTitle("Versão documentada · escolha a sua").setItems((CharSequence[]) items.toArray(new String[0]), (dialog, which) -> {
+                new LocalizedDialog(this.activity).setTitle("Escolha a versão do seu carro").setItems((CharSequence[]) items.toArray(new String[0]), (dialog, which) -> {
                     try {
                         this.draft.chooseConfiguration(this.catalog, ((VehicleCatalog.Configuration) configurations.get(which)).id);
                         this.warning = "";
@@ -318,16 +407,7 @@ public final class VehicleEditor {
                 }).setNegativeButton("Não sei / escolher depois", null).show();
                 return;
             }
-            VehicleCatalog.Configuration next = it.next();
-            ArrayList items2 = new ArrayList();
-            VehicleAttribute.Key[] keys = {VehicleAttribute.Key.MODEL_YEAR, VehicleAttribute.Key.TRIM, VehicleAttribute.Key.ENGINE, VehicleAttribute.Key.TRANSMISSION, VehicleAttribute.Key.FUEL_TYPE};
-            for (int i = 0; i < keys.length; i++) {
-                VehicleAttribute.Key key = keys[i];
-                if (next.attributes.containsKey(key)) {
-                    items2.add(next.attributes.get(key).value);
-                }
-            }
-            items.add(String.join(" · ", items2));
+            items.add(VehicleSearch.details(it.next(), withYear));
         }
     }
 
@@ -350,23 +430,23 @@ public final class VehicleEditor {
         VehicleCatalog vehicleCatalog = this.catalog;
         final List<String> emptyList = vehicleCatalog == null ? Collections.emptyList() : this.draft.options(vehicleCatalog, key);
         final ArrayList items = new ArrayList();
-        items.add("Não sei");
         items.addAll(emptyList);
+        items.add("Não sei");
         items.add("Não encontrei · informar por conta própria");
         AlertDialog.Builder builder = new LocalizedDialog(this.activity);
         StringBuilder builder2 = new StringBuilder();
         builder2.append(VehiclePresentation.title(key));
-        builder2.append(emptyList.isEmpty() ? " · sem opções no catálogo" : " · catálogo");
+        builder2.append(emptyList.isEmpty() ? " · sem opções no catálogo" : "");
         builder.setTitle(builder2.toString()).setItems((CharSequence[]) items.toArray(new String[0]), (dialog, which) -> {
             if (which == items.size() - 1) {
                 manual(key);
                 return;
             }
             try {
-                if (which == 0) {
+                if (which == items.size() - 2) {
                     this.draft.unknown(key);
                 } else {
-                    this.draft.choose(this.catalog, key, (String) emptyList.get(which - 1));
+                    this.draft.choose(this.catalog, key, (String) emptyList.get(which));
                 }
                 this.warning = "";
                 render();
@@ -418,7 +498,12 @@ public final class VehicleEditor {
     void bindDeclarationConfirm(final AlertDialog alertDialog, final VehicleAttribute.Key key, final EditText editText, DialogInterface dialogInterface) {
         alertDialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener((view) -> {
             try {
-                this.draft.confirmDeclaration(key, editText.getText().toString(), System.currentTimeMillis());
+                String option = VehicleDraft.GUIDED.contains(key) ? this.draft.option(this.catalog, key, editText.getText().toString()) : null;
+                if (option != null) {
+                    this.draft.choose(this.catalog, key, option);
+                } else {
+                    this.draft.confirmDeclaration(key, editText.getText().toString(), System.currentTimeMillis());
+                }
                 alertDialog.dismiss();
                 this.warning = "";
                 render();

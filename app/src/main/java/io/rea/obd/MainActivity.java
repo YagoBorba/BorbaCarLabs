@@ -3,6 +3,7 @@ package io.rea.obd;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -28,6 +29,7 @@ import android.util.SparseIntArray;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -152,16 +154,32 @@ public final class MainActivity extends Activity {
     private File pendingCaseExport;
     private File pendingPdf;
     private TelemetryRecorder recorder;
+    private String[] pendingAdapter;
+    private int pollFailures;
     private TextView recordingBanner;
     private LinearLayout root;
     private DataOrigin historyOrigin;
     private TextView scanView;
     private TextView statusView;
     private VehicleCatalogStore.Loaded vehicleCatalog;
+    private java.util.concurrent.Future<VehicleCatalogStore.Loaded> catalogLoad;
     private VehicleEfficiency efficiency;
 
+    private VehicleCatalogStore.Loaded catalog(boolean wait) {
+        java.util.concurrent.Future<VehicleCatalogStore.Loaded> load = this.catalogLoad;
+        if (this.vehicleCatalog == null && load != null && (wait || load.isDone())) {
+            try {
+                this.vehicleCatalog = load.get();
+            } catch (Exception e) {
+                this.vehicleCatalog = null;
+            }
+            this.catalogLoad = null;
+        }
+        return this.vehicleCatalog;
+    }
+
     private VehicleEfficiency.Official officialConsumption(VehicleProfile vehicle) {
-        if (vehicle == null || this.vehicleCatalog == null) {
+        if (vehicle == null || catalog(false) == null) {
             return null;
         }
         if (this.efficiency == null) {
@@ -278,11 +296,17 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             this.storageWarning = "Garagem indisponível: " + error(e) + ". Os dados originais foram preservados.";
         }
-        try {
-            this.vehicleCatalog = new VehicleCatalogStore(this).load();
-        } catch (Exception ignored) {
-            this.vehicleCatalog = null;
-        }
+        java.util.concurrent.FutureTask<VehicleCatalogStore.Loaded> catalogLoad = new java.util.concurrent.FutureTask<>(() -> {
+            VehicleCatalogStore.Loaded loaded = new VehicleCatalogStore(this).load();
+            this.ui.post(() -> {
+                if (!this.destroyed && this.page == 4) {
+                    render();
+                }
+            });
+            return loaded;
+        });
+        this.catalogLoad = catalogLoad;
+        new Thread(catalogLoad, "vehicle-catalog").start();
         try {
             this.historyStore = new DiagnosticHistoryStore(getPreferences(0));
             refreshHistory();
@@ -350,6 +374,14 @@ public final class MainActivity extends Activity {
             @Override
             public VehicleProfile vehicle() {
                 return MainActivity.this.activeVehicle();
+            }
+
+            @Override
+            public void offerReminders() {
+                if (MainActivity.this.destroyed || ReminderReceiver.enabled(MainActivity.this)) {
+                    return;
+                }
+                new LocalizedDialog(MainActivity.this).setTitle("Ligar lembretes?").setMessage("O app avisa quando faltarem 7 dias ou 500 km para o próximo serviço. Você pode mudar isso em Ajustes.").setPositiveButton("Ligar lembretes", (dialog, which) -> MainActivity.this.toggleReminders()).setNegativeButton("Agora não", null).show();
             }
 
             @Override
@@ -588,7 +620,7 @@ public final class MainActivity extends Activity {
         if (this.demo) {
             text = "DEMONSTRAÇÃO";
         } else {
-            text = connected() ? "● CONECTADO" : "○ OFFLINE";
+            text = connected() ? "● CONECTADO" : "○ DESCONECTADO";
         }
         if (this.demo) {
             i = this.AMBER;
@@ -650,7 +682,6 @@ public final class MainActivity extends Activity {
         }
         int page2 = this.page;
         if (page2 == 0) {
-            button(this.body, "Voltar ao diagnóstico", false, () -> navigate(1));
             dashboard();
         } else if (page2 == 1) {
             diagnostics();
@@ -705,6 +736,11 @@ public final class MainActivity extends Activity {
             value2 = 13;
         }
         I18n.apply(this.root);
+        if (this.page == 0 && (connected() || this.demo || this.recorder != null)) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     public void navigate(int i) {
@@ -746,7 +782,7 @@ public final class MainActivity extends Activity {
         } else {
             StringBuilder builder = new StringBuilder();
             builder.append(json.optString("date", "Horário não informado"));
-            builder.append(json.optBoolean("demo") ? " · SIMULADO" : " · origem conforme registro");
+            builder.append(json.optBoolean("demo") ? " · SIMULADO" : "");
             string = builder.toString();
         }
         DtcReadResult lastRead = null;
@@ -777,6 +813,14 @@ public final class MainActivity extends Activity {
             @Override
             public void journal() {
                 MainActivity.this.navigate(NavigationState.JOURNAL);
+            }
+
+            @Override
+            public void fuel() {
+                MainActivity.this.navigate(NavigationState.JOURNAL);
+                if (MainActivity.this.journal != null) {
+                    MainActivity.this.journal.add(io.rea.obd.journal.JournalEntry.Kind.FUEL);
+                }
             }
         });
         if (this.caseWarning.isEmpty()) {
@@ -927,6 +971,8 @@ public final class MainActivity extends Activity {
             }
             DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
             label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
+            io.rea.obd.knowledge.DtcGuidance guidance = io.rea.obd.knowledge.DtcGuidance.of(dtcObservation.code);
+            label(card, guidance.headline(), 14, guidance.urgent() ? this.AMBER : this.ACCENT, true).setTag("guidance-" + dtcObservation.code);
             button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
         }
     }
@@ -1161,7 +1207,7 @@ public final class MainActivity extends Activity {
             label(this.body, "Não foi possível carregar a garagem. Reinicie após verificar o armazenamento.", 14, this.AMBER, false);
         } else {
             VehicleRecord activeRecord = vehicleRepository.activeRecord();
-            GarageScreen.render(this.body, this.vehicles.records(), activeRecord == null ? "" : activeRecord.id, profileLocked(), this.vehicleCatalog, new GarageActions());
+            GarageScreen.render(this.body, this.vehicles.records(), activeRecord == null ? "" : activeRecord.id, profileLocked(), catalog(true), new GarageActions());
         }
     }
 
@@ -1259,11 +1305,29 @@ public final class MainActivity extends Activity {
     private void more() {
         String text;
         heading("BORBACAR LABS", "Ajustes", "");
-        button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
-        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
+        UiKit kit = new UiKit(this);
+        kit.section(this.body, "Demonstração", "Conheça o app com dados fictícios, sem adaptador.");
+        button(this.body, this.demo ? "Sair da demonstração" : "Ativar demonstração", false, () -> {
+            if (this.demo) {
+                disconnect();
+            } else {
+                startDemo();
+            }
+            this.page = 0;
+            render();
+        });
+        kit.section(this.body, "Uso do dia a dia", "");
         button(this.body, ReminderReceiver.enabled(this) ? "Lembretes de manutenção: ligados" : "Lembretes de manutenção: desligados", false, () -> toggleReminders());
-        button(this.body, "Aparência", false, () -> this.chooseAppearance());
+        if (ThemePalette.LIGHT.equals(ThemePalette.preference(this))) {
+            text = "Claro";
+        } else {
+            text = ThemePalette.DARK.equals(ThemePalette.preference(this)) ? "Escuro" : "Sistema";
+        }
+        button(this.body, "Tema: " + text, false, () -> this.chooseAppearance());
         button(this.body, "Idioma: " + languageName(I18n.preference(this)), false, () -> this.chooseLanguage());
+        kit.section(this.body, "Avançado", "");
+        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
+        button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
                         + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas. "
@@ -1277,31 +1341,12 @@ public final class MainActivity extends Activity {
                 message("Não foi possível salvar a preferência.");
             }
         });
-        LinearLayout linearLayout = this.body;
-        StringBuilder builder = new StringBuilder("Tema: ");
-        if (ThemePalette.LIGHT.equals(ThemePalette.preference(this))) {
-            text = "Claro";
-        } else {
-            text = ThemePalette.DARK.equals(ThemePalette.preference(this)) ? "Escuro" : "Sistema";
-        }
-        builder.append(text);
-        builder.append(" · altere com a aquisição encerrada.");
-        label(linearLayout, builder.toString(), 13, this.MUTED, false);
         LinearLayout disclosure = new UiKit(this).disclosure(this.body, "Sobre e referências");
         label(disclosure, "SOBRE ESTA VERSÃO", 12, this.ACCENT, true);
         gap(disclosure, 8);
         label(disclosure, "BorbaCar Labs · " + appVersion() + "\nAndroid 8 ou superior\nArmazenamento local · sem conta e sem envio de dados", 14, this.TEXT, false);
         gap(disclosure, 10);
         label(disclosure, "A conexão e as leituras reais precisam ser validadas em um adaptador e veículo. Use o modo de demonstração para conhecer a interface.", 13, this.MUTED, false);
-        button(this.body, this.demo ? "Sair da demonstração" : "Ativar demonstração", false, () -> {
-            if (this.demo) {
-                disconnect();
-            } else {
-                startDemo();
-            }
-            this.page = 0;
-            render();
-        });
         button(disclosure, "Fontes de protocolo", false, () -> {
             ArrayList items = new ArrayList();
             Iterator<SourceReference> it = KnowledgeRepository.all().iterator();
@@ -1438,7 +1483,7 @@ public final class MainActivity extends Activity {
             return;
         }
         try {
-            VehicleCatalogStore.Loaded loaded = this.vehicleCatalog;
+            VehicleCatalogStore.Loaded loaded = catalog(true);
             VehicleEditor vehicleEditor = new VehicleEditor(this, vehicleRecord, loaded == null ? null : loaded.catalog, new VehicleEditor.Save() {
                 @Override
                 public final void save(VehicleRecord vehicleRecord2, int i, VehicleCatalog vehicleCatalog) throws Exception {
@@ -1467,8 +1512,13 @@ public final class MainActivity extends Activity {
     }
 
     public void chooseTransport() {
-        if (activeVehicle() != null) {
-            ConnectionScreen.show(this, new ConnectionScreen.Actions() {
+        {
+            ConnectionScreen.show(this, lastAdapterName(), new ConnectionScreen.Actions() {
+                @Override
+                public void last() {
+                    MainActivity.this.reconnectLast();
+                }
+
                 @Override
                 public void nearby() {
                     MainActivity.this.scanBle();
@@ -1484,11 +1534,53 @@ public final class MainActivity extends Activity {
                     MainActivity.this.wifiDialog();
                 }
             });
+        }
+    }
+
+    String lastAdapterName() {
+        SharedPreferences preferences = getPreferences(0);
+        return preferences.getString("last_adapter_kind", "").isEmpty() ? null : preferences.getString("last_adapter_name", "adaptador");
+    }
+
+    public void reconnectLast() {
+        SharedPreferences preferences = getPreferences(0);
+        String kind = preferences.getString("last_adapter_kind", "");
+        String address = preferences.getString("last_adapter_address", "");
+        String name = preferences.getString("last_adapter_name", address);
+        if (kind.equals("wifi")) {
+            try {
+                int colon = address.lastIndexOf(':');
+                Transports.Wifi wifi = new Transports.Wifi(address.substring(0, colon), Integer.parseInt(address.substring(colon + 1)));
+                this.pendingAdapter = new String[]{kind, address, name};
+                connect(wifi, name);
+            } catch (Exception e) {
+                message("Informe IP e porta válidos.");
+            }
             return;
         }
-        this.page = 2;
-        render();
-        message("Selecione um veículo antes de conectar.");
+        if (this.adapter == null) {
+            message("Este aparelho não possui Bluetooth compatível.");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 31 && (checkSelfPermission("android.permission.BLUETOOTH_CONNECT") != PackageManager.PERMISSION_GRANTED || checkSelfPermission("android.permission.BLUETOOTH_SCAN") != PackageManager.PERMISSION_GRANTED)) {
+            requestPermissions(new String[]{"android.permission.BLUETOOTH_CONNECT", "android.permission.BLUETOOTH_SCAN"}, 102);
+            return;
+        }
+        try {
+            if (!this.adapter.isEnabled()) {
+                message("Ative o Bluetooth nas configurações.");
+                return;
+            }
+            BluetoothDevice device = this.adapter.getRemoteDevice(address);
+            this.pendingAdapter = new String[]{kind, address, name};
+            connect(kind.equals("ble") ? new Transports.Ble(this, device) : new Transports.Classic(device, this.adapter), name);
+        } catch (IllegalArgumentException | SecurityException e) {
+            message("Não foi possível reconectar. Escolha o adaptador de novo.");
+        }
+    }
+
+    static boolean looksLikeObd(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).matches(".*(obd|elm|vgate|v-link|vlink|veepeak|konnwei|icar|scan|carista|kiwi|obdlink|ancel|autel|launch).*");
     }
 
     public void chooseDevice() {
@@ -1505,14 +1597,18 @@ public final class MainActivity extends Activity {
                 new LocalizedDialog(this).setTitle("Ative o Bluetooth").setMessage("Ative o Bluetooth e pareie seu adaptador nas configurações do Android.").setPositiveButton("Abrir configurações", (dialog, which) -> startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"))).setNegativeButton("Cancelar", null).show();
                 return;
             }
-            final ArrayList items = new ArrayList(this.adapter.getBondedDevices());
-            items.sort(Comparator.comparing((obj) -> ((BluetoothDevice) obj).getAddress()));
+            final ArrayList<BluetoothDevice> items = new ArrayList<>(this.adapter.getBondedDevices());
+            final Map<BluetoothDevice, String> names = new HashMap<>();
+            for (BluetoothDevice device : items) {
+                names.put(device, device.getName() == null ? "Dispositivo Bluetooth" : device.getName());
+            }
+            items.sort(Comparator.comparing((BluetoothDevice device) -> !looksLikeObd(names.get(device))).thenComparing(device -> names.get(device).toLowerCase(Locale.ROOT)));
             int size = items.size();
             final String[] parts = new String[size + 1];
             for (int i = 0; i < items.size(); i++) {
-                BluetoothDevice bluetoothDevice = (BluetoothDevice) items.get(i);
+                BluetoothDevice bluetoothDevice = items.get(i);
                 StringBuilder builder = new StringBuilder();
-                builder.append(bluetoothDevice.getName() == null ? "Dispositivo Bluetooth" : bluetoothDevice.getName());
+                builder.append(names.get(bluetoothDevice));
                 builder.append("\n");
                 builder.append(bluetoothDevice.getAddress());
                 parts[i] = builder.toString();
@@ -1522,7 +1618,8 @@ public final class MainActivity extends Activity {
                 if (which == items.size()) {
                     startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"));
                 } else {
-                    connect(new Transports.Classic((BluetoothDevice) items.get(which), this.adapter), parts[which].split("\\n")[0]);
+                    this.pendingAdapter = new String[]{"classic", items.get(which).getAddress(), parts[which].split("\\n")[0]};
+                    connect(new Transports.Classic(items.get(which), this.adapter), parts[which].split("\\n")[0]);
                 }
             }).setNegativeButton("Cancelar", null).show();
         } catch (SecurityException ignored) {
@@ -1556,6 +1653,9 @@ public final class MainActivity extends Activity {
         if (i == 101) {
             scanBle();
         }
+        if (i == 102) {
+            reconnectLast();
+        }
     }
 
     public void wifiDialog() {
@@ -1565,12 +1665,12 @@ public final class MainActivity extends Activity {
         final EditText editText = new EditText(this);
         editText.setSingleLine(true);
         editText.setHint("IP do adaptador (ex.: 192.168.0.10)");
-        editText.setText(getPreferences(0).getString("wifi_host", ""));
+        editText.setText(getPreferences(0).getString("wifi_host", "192.168.0.10"));
         linearLayout.addView(editText);
         final EditText editText2 = new EditText(this);
         editText2.setInputType(InputType.TYPE_CLASS_NUMBER);
-        editText2.setHint("Porta documentada pelo fabricante");
-        editText2.setText(getPreferences(0).getString("wifi_port", ""));
+        editText2.setHint("Porta (a mais comum é 35000)");
+        editText2.setText(getPreferences(0).getString("wifi_port", "35000"));
         linearLayout.addView(editText2);
         new LocalizedDialog(this).setTitle("Adaptador Wi-Fi TCP").setView(linearLayout).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", (dialog, which) -> {
             try {
@@ -1580,6 +1680,7 @@ public final class MainActivity extends Activity {
                     throw new IllegalArgumentException();
                 }
                 getPreferences(0).edit().putString("wifi_host", wifiHost).putString("wifi_port", Integer.toString(value)).apply();
+                this.pendingAdapter = new String[]{"wifi", wifiHost + ":" + value, wifiHost + ":" + value};
                 connect(new Transports.Wifi(wifiHost, value), wifiHost + ":" + value);
             } catch (Exception ignored) {
                 message("Informe IP e porta válidos.");
@@ -1612,11 +1713,15 @@ public final class MainActivity extends Activity {
             return;
         }
         final LinkedHashMap map = new LinkedHashMap();
+        final List<BluetoothDevice> found = new ArrayList<>();
+        final int[] obdCount = {0};
         final ArrayAdapter arrayAdapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1);
         final AlertDialog alertDialog = new LocalizedDialog(this).setTitle("Procurando adaptadores BLE…").setAdapter(arrayAdapter, (dialog, which) -> {
-            BluetoothDevice bluetoothDevice = (BluetoothDevice) new ArrayList(map.values()).get(which);
+            BluetoothDevice bluetoothDevice = found.get(which);
             stopBleScan();
-            connect(new Transports.Ble(this, bluetoothDevice), (String) arrayAdapter.getItem(which));
+            String label = ((String) arrayAdapter.getItem(which)).split(" · ")[0];
+            this.pendingAdapter = new String[]{"ble", bluetoothDevice.getAddress(), label};
+            connect(new Transports.Ble(this, bluetoothDevice), label);
         }).setNegativeButton("Cancelar", (dialog, which) -> stopBleScan()).create();
         final ScanCallback scanCallback = new ScanCallback() {
             @Override
@@ -1634,15 +1739,12 @@ public final class MainActivity extends Activity {
                 }
                 map.put(device.getAddress(), device);
                 String name = device.getName();
-                ArrayAdapter arrayAdapter2 = arrayAdapter;
-                StringBuilder builder = new StringBuilder();
-                if (name == null) {
-                    name = "Dispositivo BLE";
+                if (name == null || name.trim().isEmpty()) {
+                    return;
                 }
-                builder.append(name);
-                builder.append(" · ");
-                builder.append(device.getAddress());
-                arrayAdapter2.add(builder.toString());
+                int position = looksLikeObd(name) ? obdCount[0]++ : found.size();
+                found.add(position, device);
+                arrayAdapter.insert(name + " · " + device.getAddress(), position);
             }
         };
         this.bleCallback = scanCallback;
@@ -1682,7 +1784,7 @@ public final class MainActivity extends Activity {
     }
 
     private void connect(ElmTransport elmTransport, String deviceName) {
-        disconnect();
+        disconnect(false);
         this.acquisitionSessionId = UUID.randomUUID().toString();
         final int i = this.session;
         final ElmSession elmSession = new ElmSession(elmTransport);
@@ -1696,6 +1798,7 @@ public final class MainActivity extends Activity {
             ScheduledExecutorService scheduledExecutorService = this.watchdog;
             Objects.requireNonNull(elmSession);
             ScheduledFuture<?> schedule = scheduledExecutorService.schedule(() -> elmSession.close(), 35L, TimeUnit.SECONDS);
+            String[] candidate = this.pendingAdapter;
             try {
                 elmSession.connect();
                 schedule.cancel(false);
@@ -1707,6 +1810,10 @@ public final class MainActivity extends Activity {
                         connectionLost(elmSession);
                         return;
                     }
+                    if (candidate != null) {
+                        getPreferences(0).edit().putString("last_adapter_kind", candidate[0]).putString("last_adapter_address", candidate[1]).putString("last_adapter_name", candidate[2]).apply();
+                    }
+                    this.pollFailures = 0;
                     this.busy = false;
                     this.status = this.deviceName + " · ECU respondeu · " + elmSession.protocol();
                     render();
@@ -1730,6 +1837,11 @@ public final class MainActivity extends Activity {
     }
 
     public void disconnect() {
+        disconnect(true);
+    }
+
+    private void disconnect(boolean keepReading) {
+        boolean keep = keepReading && !this.demo && this.currentDtcRead != null;
         this.session++;
         this.guidedStatus = "";
         this.guidedCompleted = 0;
@@ -1748,18 +1860,20 @@ public final class MainActivity extends Activity {
         clearHistories();
         this.voltage = "—";
         this.voltageOrigin = null;
-        this.currentDtcRead = null;
-        this.currentDtcVehicle = null;
-        this.currentDtcRecord = null;
-        this.currentSupplement = null;
-        this.currentCaseSamples = Collections.emptyList();
-        this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
+        if (!keep) {
+            this.currentDtcRead = null;
+            this.currentDtcVehicle = null;
+            this.currentDtcRecord = null;
+            this.currentSupplement = null;
+            this.currentCaseSamples = Collections.emptyList();
+            this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
+        }
         this.status = "Nenhum adaptador conectado";
         render();
     }
 
     public void startDemo() {
-        disconnect();
+        disconnect(false);
         this.acquisitionSessionId = UUID.randomUUID().toString();
         this.demo = true;
         this.status = "Simulador local · dados fictícios";
@@ -1770,7 +1884,7 @@ public final class MainActivity extends Activity {
 
     public void schedulePoll(long value) {
         this.ui.removeCallbacks(this.pollTask);
-        if (this.resumed && !this.destroyed && this.page == 0) {
+        if (this.resumed && !this.destroyed && (this.page == 0 || this.recorder != null)) {
             if (this.demo || connected()) {
                 this.ui.postDelayed(this.pollTask, value);
             }
@@ -1778,7 +1892,7 @@ public final class MainActivity extends Activity {
     }
 
     public void poll() {
-        if (!this.resumed || this.page != 0 || this.busy || this.polling) {
+        if (!this.resumed || (this.page != 0 && this.recorder == null) || this.busy || this.polling) {
             return;
         }
         if (this.demo || connected()) {
@@ -1830,10 +1944,16 @@ public final class MainActivity extends Activity {
                         acceptSample(it.next());
                     }
                     if (poll.failure != null) {
+                        this.pollFailures++;
+                        if (elmSession.isConnected() && this.pollFailures < 3) {
+                            schedulePoll(1500L);
+                            return;
+                        }
                         connectionLost(elmSession);
-                        message(error(poll.failure));
+                        lost(error(poll.failure));
                         return;
                     }
+                    this.pollFailures = 0;
                     this.voltageOrigin = DataOrigin.VEHICLE;
                     this.voltage = poll.adapterVoltage == null ? "—" : String.format(Locale.getDefault(), "%.1f V", poll.adapterVoltage);
                     this.voltageTime = poll.voltageElapsedMillis;
@@ -1931,6 +2051,17 @@ public final class MainActivity extends Activity {
         views.bind(dashboardState, list, text3, this.historySessionId, flag ? this.voltage : "—", string, text5);
     }
 
+    private void lost(String text) {
+        if (this.destroyed) {
+            return;
+        }
+        AlertDialog.Builder builder = new LocalizedDialog(this).setTitle("Conexão perdida").setMessage(text).setNegativeButton("Fechar", null);
+        if (lastAdapterName() != null) {
+            builder.setPositiveButton("Reconectar", (dialog, which) -> reconnectLast());
+        }
+        builder.show();
+    }
+
     private void connectionLost(ElmSession elmSession) {
         if (this.connection != elmSession) {
             return;
@@ -1952,7 +2083,10 @@ public final class MainActivity extends Activity {
             return;
         }
         if (this.demo || connected()) {
-            if (activeVehicle() != null) {
+            if (activeVehicle() != null && getPreferences(0).getBoolean("guided_read_explained", false)) {
+                startGuidedRead();
+            } else if (activeVehicle() != null) {
+                getPreferences(0).edit().putBoolean("guided_read_explained", true).apply();
                 new LocalizedDialog(this).setTitle("Leitura guiada").setMessage(("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n" + DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT + "\n\n").concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
             } else {
                 navigate(2);
@@ -2305,7 +2439,10 @@ public final class MainActivity extends Activity {
         if (this.demo) {
             message("SIMULAÇÃO: VIN fictício, não representa o veículo.");
         } else {
-            runRead("VIN e calibração", (obdReader) -> obdReader.vehicleInfo());
+            VehicleProfile profile = activeVehicle();
+            String make = profile == null ? null : profile.make;
+            Integer year = profile == null ? null : profile.year;
+            runRead("VIN e calibração", (obdReader) -> withVin(obdReader.vehicleInfo(), make, year));
         }
     }
 
@@ -2315,6 +2452,15 @@ public final class MainActivity extends Activity {
         } else {
             runRead("Quadro congelado · quadro 00", (obdReader) -> obdReader.freezeFrame());
         }
+    }
+
+    static String withVin(String info, String make, Integer year) {
+        if (!info.startsWith("VIN: ")) {
+            return info;
+        }
+        int end = info.indexOf('\n');
+        String extra = io.rea.obd.vehicle.VinDecoder.describe(info.substring(5, end < 0 ? info.length() : end), java.time.LocalDate.now().getYear(), make, year);
+        return extra.isEmpty() ? info : info + "\n" + extra;
     }
 
     private void runRead(String title, final ReadAction readAction) {

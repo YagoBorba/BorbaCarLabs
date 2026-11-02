@@ -116,6 +116,60 @@ public class GarageSaveTest {
     }
 
     @Test
+    public void searchingByTextFindsTheVersionAndSavesIt() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.navigate(NavigationState.GARAGE);
+        idle();
+        Dialog editor = openEditor(activity, null);
+        EditText search = editor.getWindow().getDecorView().findViewWithTag("vehicle-search");
+        assertNotNull(search);
+        search.setText("cobalt 2019 elite");
+        idle();
+        String shown = texts(editor.getWindow().getDecorView());
+        assertTrue(shown, shown.contains("Chevrolet Cobalt 2019\nElite"));
+        Button result = button(editor.getWindow().getDecorView(), "Chevrolet Cobalt 2019\nElite · 1.8 L · 8V · Automático · 6 marchas · Flex");
+        assertNotNull(shown, result);
+        result.performClick();
+        idle();
+        assertTrue(texts(editor.getWindow().getDecorView()).contains("Revise seu perfil"));
+        press(editor, "Salvar perfil");
+        VehicleRecord saved = new VehicleRepository(activity.getPreferences(0)).activeRecord();
+        assertEquals("Chevrolet Cobalt 2019", saved.name);
+        assertEquals("Elite", saved.attribute(VehicleAttribute.Key.TRIM).value);
+        assertEquals(FactProvenance.Origin.CATALOG, saved.attribute(VehicleAttribute.Key.TRIM).provenance.origin);
+        controller.pause().stop().destroy();
+    }
+
+    @Test
+    public void typingAYearThatIsInTheCatalogKeepsTheCatalogChoices() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.navigate(NavigationState.GARAGE);
+        idle();
+        Dialog editor = openEditor(activity, null);
+        pick(editor, VehicleAttribute.Key.MAKE, "Chevrolet");
+        pick(editor, VehicleAttribute.Key.MODEL, "Onix");
+        AlertDialog years = null;
+        editor.getWindow().getDecorView().findViewWithTag("vehicle-field-MODEL_YEAR").performClick();
+        idle();
+        years = list();
+        CharSequence[] items = shadowOf(years).getItems();
+        assertEquals("2026", items[0].toString());
+        assertEquals("Não encontrei · informar por conta própria", items[items.length - 1].toString());
+        shadowOf(years).clickOnItem(items.length - 1);
+        idle();
+        AlertDialog manual = ShadowAlertDialog.getLatestAlertDialog();
+        EditText input = manual.findViewById(android.R.id.content).findViewWithTag("vehicle-manual-value");
+        input.setText("2019");
+        manual.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+        idle();
+        press(editor, "Continuar");
+        assertTrue(button(editor.getWindow().getDecorView(), "Escolher versão do catálogo").isEnabled());
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void savingACarChosenFromTheCatalogClosesTheEditorAndSelectsTheCar() throws Exception {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
@@ -134,7 +188,7 @@ public class GarageSaveTest {
 
         VehicleRecord saved = new VehicleRepository(activity.getPreferences(0)).activeRecord();
         assertNotNull(saved);
-        assertEquals("Cobalt 2019", saved.name);
+        assertEquals("Chevrolet Cobalt 2019", saved.name);
         assertEquals("Chevrolet", saved.attribute(VehicleAttribute.Key.MAKE).value);
         assertNotNull(saved.attribute(VehicleAttribute.Key.ENGINE).value);
         assertEquals(FactProvenance.Origin.CATALOG, saved.attribute(VehicleAttribute.Key.ENGINE).provenance.origin);

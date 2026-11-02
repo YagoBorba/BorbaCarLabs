@@ -71,14 +71,17 @@ public final class DashboardScreen {
                 DashboardState.Reading reading = reading(dashboardState, entry.getKey().intValue());
                 entry.getValue().setText(I18n.t(reading.value));
                 TextView quality = this.qualities.get(entry.getKey());
-                quality.setText(I18n.t(reading.quality));
-                quality.setTextColor(uiKit.palette.color(attention(reading) ? UiKit.AMBER : UiKit.MUTED));
+                String warning = alert(reading);
+                quality.setText(I18n.t(warning != null ? warning : reading.status == TelemetrySample.Status.VALID ? "" : reading.quality));
+                quality.setTextColor(uiKit.palette.color(warning != null || reading.status != TelemetrySample.Status.VALID ? UiKit.AMBER : UiKit.MUTED));
                 boolean open = entry.getKey().intValue() == this.expanded;
                 this.tiles.get(entry.getKey()).setContentDescription(I18n.t(reading.sensor.name) + ": " + reading.value + " " + reading.sensor.unit + ". " + I18n.t(reading.quality) + ". " + I18n.t(open ? "Gráfico aberto abaixo" : "Toque para ver o gráfico"));
             }
             DashboardState.Reading reading = reading(dashboardState, this.expanded);
             this.value.setText(I18n.t(reading.value));
-            this.quality.setText(I18n.t(reading.quality));
+            String warning = alert(reading);
+            this.quality.setText(warning == null ? I18n.t(reading.quality) : I18n.t(warning) + " · " + I18n.t(reading.quality));
+            this.quality.setTextColor(uiKit.palette.color(warning != null || attention(reading) ? UiKit.AMBER : UiKit.MUTED));
             this.origin.setText(I18n.t(reading.origin));
             this.origin.setVisibility(reading.origin.equals("Dado simulado") ? View.GONE : View.VISIBLE);
             this.time.setText(I18n.t(reading.time));
@@ -103,6 +106,23 @@ public final class DashboardScreen {
     static DashboardState.Reading reading(DashboardState dashboardState, int pid) {
         DashboardState.Reading reading = dashboardState.readings.get(Integer.valueOf(pid));
         return reading != null ? reading : dashboardState.rpm;
+    }
+
+    static String alert(DashboardState.Reading reading) {
+        if (reading.status != TelemetrySample.Status.VALID || reading.sample == null || reading.sample.value == null) {
+            return null;
+        }
+        double value = reading.sample.value;
+        if (reading.sensor.pid == 5 && value >= 110.0d) {
+            return "Temperatura alta: pare com segurança e confira o painel";
+        }
+        if (reading.sensor.pid == 66 && (value < 11.8d || value > 15.2d)) {
+            return value < 11.8d ? "Tensão baixa: bateria ou alternador" : "Tensão alta: confira o alternador";
+        }
+        if (reading.sensor.pid == 12 && value > 6500.0d) {
+            return "Rotação muito alta";
+        }
+        return null;
     }
 
     static boolean attention(DashboardState.Reading reading) {

@@ -30,6 +30,9 @@ public final class HomeScreen {
         void history();
 
         void journal();
+
+        default void fuel() {
+        }
     }
 
     public static void render(LinearLayout linearLayout, VehicleProfile vehicleProfile, String status, String text, int i, int value, boolean demo, boolean flag, boolean connected, DtcReadResult lastRead, JournalController.Glance glance, VehicleEfficiency.Official official, final Actions actions) {
@@ -53,6 +56,10 @@ public final class HomeScreen {
         if (journal) {
             service(uiKit, summary, glance.reminder);
             fuel(uiKit, summary, glance, official);
+        }
+        if (journal && !demo) {
+            Objects.requireNonNull(actions);
+            uiKit.button(linearLayout, "Registrar abastecimento", false, () -> actions.fuel()).setTag("home-fuel");
         }
         if (i > 0 || value > 0) {
             String saved = i > 0 ? Format.count(i, "leitura salva", "leituras salvas") : "";

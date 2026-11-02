@@ -2,12 +2,16 @@ package io.rea.obd.vehicle;
 
 import io.rea.obd.model.FactProvenance;
 import io.rea.obd.vehicle.catalog.VehicleCatalog;
+import io.rea.obd.vehicle.catalog.VehicleSearch;
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
@@ -64,15 +68,40 @@ public final class VehicleDraft {
         if (!GUIDED.contains(key)) {
             return Collections.emptyList();
         }
-        TreeSet treeSet = new TreeSet();
-        Iterator<VehicleCatalog.Configuration> it = vehicleCatalog.matching(parents(key)).iterator();
-        while (it.hasNext()) {
-            VehicleAttribute vehicleAttribute = it.next().attributes.get(key);
+        Collator collator = Collator.getInstance(new Locale("pt", "BR"));
+        collator.setStrength(Collator.SECONDARY);
+        Comparator<String> order = key == VehicleAttribute.Key.MODEL_YEAR ? Comparator.<String>reverseOrder() : (a, b) -> {
+            int compared = collator.compare(a, b);
+            return compared != 0 ? compared : a.compareTo(b);
+        };
+        TreeSet<String> treeSet = new TreeSet<>(order);
+        for (VehicleCatalog.Configuration configuration : vehicleCatalog.matching(parents(key))) {
+            VehicleAttribute vehicleAttribute = configuration.attributes.get(key);
             if (vehicleAttribute != null) {
                 treeSet.add(vehicleAttribute.value);
             }
         }
-        return Collections.unmodifiableList(new ArrayList(treeSet));
+        return Collections.unmodifiableList(new ArrayList<>(treeSet));
+    }
+
+    public String option(VehicleCatalog vehicleCatalog, VehicleAttribute.Key key, String text) {
+        if (vehicleCatalog == null || text == null) {
+            return null;
+        }
+        String wanted = VehicleSearch.normalize(text);
+        for (String option : options(vehicleCatalog, key)) {
+            if (VehicleSearch.normalize(option).equals(wanted)) {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    public void selectConfiguration(VehicleCatalog vehicleCatalog, String id) {
+        for (VehicleAttribute.Key key : GUIDED) {
+            this.attrs.put(key, VehicleAttribute.unknown(key));
+        }
+        chooseConfiguration(vehicleCatalog, id);
     }
 
     private void clearChildren(VehicleAttribute.Key key) {
