@@ -130,6 +130,16 @@ public final class DiagnosisScreen {
             if (code.structure != null) {
                 ui.label(card, code.structure, 13, UiKit.ACCENT, true);
             }
+            io.rea.obd.knowledge.DtcGuidance guidance = io.rea.obd.knowledge.DtcGuidance.of(code.code);
+            ui.eyebrow(card, "POSSO CONTINUAR RODANDO?");
+            ui.label(card, guidance.headline(), 15, guidance.urgent() ? UiKit.AMBER : UiKit.TEXT, true);
+            ui.label(card, guidance.advice, 13, UiKit.TEXT, false);
+            if (!guidance.causes.isEmpty()) {
+                ui.eyebrow(card, "CAUSAS COMUNS · NÃO CONFIRMADAS");
+                for (String cause : guidance.causes) {
+                    ui.label(card, "• " + cause, 13, UiKit.TEXT, false);
+                }
+            }
             ui.eyebrow(card, "EVIDÊNCIA");
             for (String line : code.evidence()) {
                 ui.label(card, line, 13, UiKit.TEXT, false);

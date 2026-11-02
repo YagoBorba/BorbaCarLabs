@@ -1,9 +1,13 @@
 package io.rea.obd;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -14,6 +18,7 @@ import android.widget.TextView;
 import io.rea.obd.journal.JournalEntry;
 import io.rea.obd.journal.JournalStore;
 import io.rea.obd.ui.NavigationState;
+import io.rea.obd.vehicle.VehicleAttribute;
 import io.rea.obd.vehicle.VehicleProfile;
 import io.rea.obd.vehicle.VehicleRepository;
 import java.io.File;
@@ -24,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,6 +42,8 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.GraphicsMode;
+import org.robolectric.shadows.ShadowAlertDialog;
+import org.robolectric.shadows.ShadowDialog;
 
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -43,7 +51,7 @@ import org.robolectric.annotation.GraphicsMode;
 public class EnglishScreensTest {
     private static final File OUT = new File("build/screenshots/en");
     private static final Pattern PORTUGUESE = Pattern.compile(
-            "[ãõçáéíóúâêôÃÕÇÁÉÍÓÚÂÊÔ]|\\b(de|da|dos|das|não|com|para|em|uma|um|sem|seu|sua|você|leitura|leituras|veículo|registro|registros|consulta|hoje|ontem|consumo|gasolina|etanol|cidade|estrada|dias|sensores|ajustes|garagem|sintomas|tanque|cheio|abastecimentos|simulado|acompanhamento|ligados|desligados|salvar|voltar|continuar|cancelar|fechar|remover|apagar|enviar|falha|falhas|indicada|indicadas|simulador)\\b",
+            "[ãõçáéíóúâêôÃÕÇÁÉÍÓÚÂÊÔ]|\\b(de|da|dos|das|não|com|para|em|uma|um|sem|seu|sua|você|leitura|leituras|veículo|registro|registros|consulta|hoje|ontem|consumo|gasolina|etanol|cidade|estrada|dias|sensores|ajustes|garagem|sintomas|tanque|cheio|abastecimentos|simulado|acompanhamento|ligados|desligados|salvar|voltar|continuar|cancelar|fechar|remover|apagar|enviar|falha|falhas|indicada|indicadas|simulador|ano|modelo|modelos|marca|marcas|fabricante|mercado|perfil|apelido|opcional|detalhes|escolher|informar|outros|podem|como|simples|meu|minha|carro)\\b",
             Pattern.CASE_INSENSITIVE);
 
     private final Set<String> untranslated = new LinkedHashSet<>();
@@ -88,7 +96,7 @@ public class EnglishScreensTest {
         texts(root, found);
         for (String text : found) {
             for (String line : text.split("\n")) {
-                if (PORTUGUESE.matcher(line).find() && !line.contains("Cobalt") && !line.contains("Português")) {
+                if (PORTUGUESE.matcher(line.replaceAll("https?://\\S+", "")).find() && !line.contains("Cobalt") && !line.contains("Português")) {
                     untranslated.add(name + " | " + line);
                 }
             }
@@ -164,9 +172,90 @@ public class EnglishScreensTest {
         check(activity, "10-today-after-reading");
         empty.pause().stop().destroy();
 
-        File report = new File("build/untranslated.txt");
-        Files.write(report.toPath(), String.join("\n", untranslated).getBytes(StandardCharsets.UTF_8));
+        assertAllTranslated("build/untranslated.txt");
+    }
+
+    private void assertAllTranslated(String path) throws IOException {
+        Files.write(new File(path).toPath(), String.join("\n", untranslated).getBytes(StandardCharsets.UTF_8));
         assertTrue("Textos sem tradução:\n" + String.join("\n", untranslated), untranslated.isEmpty());
         assertEquals(0, untranslated.size());
+    }
+
+    private static View withText(View view, String text) {
+        if (view instanceof TextView && ((TextView) view).getText().toString().equals(text)) {
+            return view;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View found = withText(group.getChildAt(i), text);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void tap(Dialog editor, String text) {
+        View view = withText(editor.getWindow().getDecorView(), text);
+        assertNotNull("\"" + text + "\" ausente no editor", view);
+        view.performClick();
+        idle();
+    }
+
+    private void pick(Dialog editor, VehicleAttribute.Key key, String option, String name) throws IOException {
+        editor.getWindow().getDecorView().findViewWithTag("vehicle-field-" + key.name()).performClick();
+        idle();
+        AlertDialog list = ShadowAlertDialog.getLatestAlertDialog();
+        check(list.getWindow().getDecorView(), name);
+        int index = Arrays.asList(shadowOf(list).getItems()).stream().map(CharSequence::toString).toList().indexOf(option);
+        assertTrue(option + " ausente", index >= 0);
+        shadowOf(list).clickOnItem(index);
+        idle();
+    }
+
+    @Test
+    public void garageEditorIsInEnglish() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.navigate(NavigationState.GARAGE);
+        idle();
+        activity.editVehicle(null);
+        idle();
+        Dialog editor = ShadowDialog.getLatestDialog();
+        check(editor.getWindow().getDecorView(), "11-editor-start");
+        pick(editor, VehicleAttribute.Key.MAKE, "Chevrolet", "11a-make-list");
+        pick(editor, VehicleAttribute.Key.MODEL, "Cobalt", "11b-model-list");
+        pick(editor, VehicleAttribute.Key.MODEL_YEAR, "2019", "11c-year-list");
+        check(editor.getWindow().getDecorView(), "12-editor-car");
+        tap(editor, "Continue");
+        check(editor.getWindow().getDecorView(), "13-editor-version");
+        tap(editor, "Choose a version from the catalog");
+        AlertDialog versions = ShadowAlertDialog.getLatestAlertDialog();
+        check(versions.getWindow().getDecorView(), "13a-version-list");
+        shadowOf(versions).clickOnItem(0);
+        idle();
+        tap(editor, "Other details (optional)");
+        check(editor.getWindow().getDecorView(), "14-editor-details");
+        editor.getWindow().getDecorView().findViewWithTag("vehicle-field-NOTES").performClick();
+        idle();
+        AlertDialog notes = ShadowAlertDialog.getLatestAlertDialog();
+        check(notes.getWindow().getDecorView(), "14a-notes-list");
+        shadowOf(notes).clickOnItem(shadowOf(notes).getItems().length - 1);
+        idle();
+        AlertDialog manual = ShadowAlertDialog.getLatestAlertDialog();
+        check(manual.getWindow().getDecorView(), "14b-notes-manual");
+        manual.dismiss();
+        idle();
+        tap(editor, "Continue");
+        editor.getWindow().getDecorView().findViewWithTag("disclosure-Ver fontes e identificação completa").performClick();
+        idle();
+        check(editor.getWindow().getDecorView(), "15-editor-review");
+        tap(editor, "Save profile");
+        assertFalse(editor.isShowing());
+        check(activity, "16-garage-with-catalog-car");
+        controller.pause().stop().destroy();
+        assertAllTranslated("build/untranslated-editor.txt");
     }
 }

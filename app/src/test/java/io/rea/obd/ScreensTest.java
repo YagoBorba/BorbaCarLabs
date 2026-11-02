@@ -216,7 +216,8 @@ public class ScreensTest {
             assertTrue("sensor " + pid + " cortado", visible.height() == tile.getHeight());
             assertFalse("sensor " + pid + " sem valor", texts(tile).startsWith(io.rea.obd.SensorCatalog.get(pid).name + "\n—"));
         }
-        assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 12)).contains("Simulado"));
+        assertTrue(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 12).getContentDescription().toString().contains("Simulado"));
+        assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED)).contains("Simulado"));
         assertTrue(texts(root).contains("DADOS SIMULADOS · nenhum veículo está sendo consultado"));
         assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED)).startsWith("Rotação do motor"));
 
