@@ -11,12 +11,6 @@ updates:
       - dependency-name: gradle-wrapper
         update-types: ["version-update:semver-major"]
 
-  - package-ecosystem: npm
-    directory: /server
-    target-branch: develop
-    schedule:
-      interval: monthly
-
   - package-ecosystem: github-actions
     directory: /
     target-branch: develop

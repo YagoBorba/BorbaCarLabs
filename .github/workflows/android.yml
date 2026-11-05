@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build, testes e lint
+    name: Build, tests and lint
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,52 +28,32 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      - name: Compilar, testar e analisar
+      - name: Build, test and lint
         run: ./gradlew assembleDebug testDebugUnitTest lintDebug --stacktrace
 
-      - name: Relatório dos testes
+      - name: Test report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: testes
+          name: test-report
           path: app/build/reports/tests/testDebugUnitTest/
 
-      - name: Relatório do lint
+      - name: Lint report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: lint
+          name: lint-report
           path: app/build/reports/lint-results-debug.html
 
-      - name: Capturas das telas
+      - name: Screen captures
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: telas
+          name: screenshots
           path: app/build/screenshots/
 
-      - name: APK de teste
+      - name: Debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: apk-teste
+          name: debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-
-  server:
-    name: Servidor de IA
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: server
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-      - run: npm ci
-      - name: Sintaxe
-        run: node --check server.mjs
-      - name: Testes
-        run: npm test
