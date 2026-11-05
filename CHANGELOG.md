@@ -2,11 +2,15 @@
 
 ## Unreleased
 
+- Friendlier AI chat: questions and replies appear as chat bubbles, each reply answers the question directly in plain language, and possible causes, missing information and what to check sit in a collapsible section under the reply. Suggestions send with one tap and change after the first answer. The raw JSON preview before every request was replaced by a plain-language notice shown once per provider ("See the data sent to the AI" stays in More options). Errors appear in the chat with "Try again" or "Set up the key".
+- AI replies no longer fail when the model writes text instead of a reference in a hypothesis: the response schema lists the refs that were sent, and anything else is dropped from the reply instead of discarding it. Overlong lists are trimmed.
+- A busy model (HTTP 500/503/529) is retried once, then the lighter model of the same provider is used (`gemini-3.1-flash-lite` or `claude-haiku-5-5`) when no model was chosen.
+- The key setup shows whether a key is saved, colors the test result and ignores spaces, line breaks and quotes copied with the key.
 - AI with your own API key: the app calls Gemini (Google) or Claude (Anthropic) directly over HTTPS. Paste a key in **Settings › AI analysis**, choose the provider and tap **Save and test key**; the test checks the key and model without generating text. Keys are encrypted with an Android Keystore key, kept per provider and only sent in a header to that provider. No computer, local server or shared Wi-Fi is needed, and the release build works too.
-- The Node.js AI server, `start-ai.ps1`, the server invitation and the server CI job were removed. The instructions, response schema and case limits now live in the app; replies are still rejected when they cite evidence that was not sent.
+- The Node.js AI server, `start-ai.ps1`, the server invitation and the server CI job were removed. The instructions, response schema and case limits now live in the app.
 - Clear messages for a rejected key, usage limit, unavailable model, overloaded provider, refusal, truncated reply and provider errors such as a low credit balance. Default models: `gemini-3.5-flash-lite` and `claude-sonnet-5-5`, both overridable; Claude keys without a workspace can set its ID.
 - The debug build no longer allows cleartext HTTP.
-- Academic AI experience: case-scoped conversation per revision, suggested questions, local history kept apart from the facts, a preview before every request, sharing with an AI app chosen by the user, and an offline guide that is explicitly not AI.
+- Academic AI experience: case-scoped conversation per revision, suggested questions, local history kept apart from the facts, sharing with an AI app chosen by the user, and an offline guide that is explicitly not AI.
 - Restorable logical backup of garage, readings, investigation revisions and journal; validation before replacing data, undo, and recovery of an interrupted restore. CSV, credentials, preferences and AI conversations are not part of the backup.
 - Maintenance overdue by distance now comes before services that are only due later by date; the summary flags the distance overdue.
 - Academic protocol with five synthetic cases, optional evaluation against a real model, human review and a pending physical test checklist.

@@ -46,6 +46,7 @@ public class AnalysisClientTest {
         originalGemini = AnalysisClient.geminiBase;
         originalClaude = AnalysisClient.claudeBase;
         KeyVault.backend = TestVault.INSTANCE;
+        AnalysisClient.overloadRetries = 0;
     }
 
     @After
@@ -57,12 +58,39 @@ public class AnalysisClientTest {
         }
     }
 
+    @After
+    public void restoreRetries() {
+        AnalysisClient.overloadRetries = 1;
+    }
+
     private String serve(int status, String body) throws IOException {
+        return serve(new int[]{status}, new String[]{body});
+    }
+
+    /** Answers one connection per entry, in order; counts them in {@link #requests}. */
+    private String serve(int[] statuses, String[] bodies) throws IOException {
         ServerSocket socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
         server = socket;
         headers.clear();
+        requests.set(0);
         Thread thread = new Thread(() -> {
+            for (int turn = 0; turn < statuses.length; turn++) {
+                answer(socket, statuses[turn], bodies[turn]);
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+        String base = "http://127.0.0.1:" + socket.getLocalPort();
+        AnalysisClient.geminiBase = base + "/v1beta";
+        AnalysisClient.claudeBase = base + "/v1";
+        return base;
+    }
+
+    private final java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
+
+    private void answer(ServerSocket socket, int status, String body) {
             try (Socket client = socket.accept()) {
+                requests.incrementAndGet();
                 // Content-Length counts bytes, so the body is read as bytes (accented text is longer in UTF-8).
                 InputStream input = client.getInputStream();
                 requestLine = readLine(input);
@@ -92,13 +120,25 @@ public class AnalysisClientTest {
                 out.flush();
             } catch (IOException ignored) {
             }
-        });
-        thread.setDaemon(true);
-        thread.start();
-        String base = "http://127.0.0.1:" + socket.getLocalPort();
-        AnalysisClient.geminiBase = base + "/v1beta";
-        AnalysisClient.claudeBase = base + "/v1";
-        return base;
+    }
+
+    @Test
+    public void aMomentaryOverloadIsRetriedOnce() throws Exception {
+        AnalysisClient.overloadRetries = 1;
+        serve(new int[]{503, 200}, new String[]{"{\"error\":{\"code\":503,\"status\":\"UNAVAILABLE\"}}",
+                geminiReply(analysisJson("D1", "media"), "STOP")});
+        JSONObject response = AnalysisClient.analyze(settings(AiProvider.GEMINI, ""), KEY, request());
+        assertEquals(2, requests.get());
+        assertEquals("gemini-test", response.getString("model"));
+    }
+
+    @Test
+    public void aBusyDefaultModelFallsBackToTheLighterOne() throws Exception {
+        serve(new int[]{503, 200}, new String[]{"{\"error\":{\"code\":503,\"status\":\"UNAVAILABLE\"}}",
+                geminiReply(analysisJson("D1", "media"), "STOP")});
+        AnalysisClient.analyze(settings(AiProvider.GEMINI, ""), KEY, request());
+        assertEquals(2, requests.get());
+        assertTrue(requestLine.contains("/models/" + AiProvider.GEMINI.fallbackModel + ":generateContent"));
     }
 
     /** Reads one CRLF-terminated header line; returns "" at the end of the headers or of the stream. */
@@ -236,8 +276,10 @@ public class AnalysisClientTest {
         serve(404, "{\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: x\"}}");
         assertEquals(AnalysisClient.MODEL_UNAVAILABLE, failure(AiProvider.CLAUDE));
         stop();
-        serve(529, "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}");
+        String overloaded = "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}";
+        serve(new int[]{529, 529}, new String[]{overloaded, overloaded});
         assertEquals(AnalysisClient.OVERLOADED, failure(AiProvider.CLAUDE));
+        assertEquals("the lighter model is tried before giving up", 2, requests.get());
     }
 
     @Test
@@ -308,15 +350,20 @@ public class AnalysisClientTest {
     }
 
     @Test
-    public void answerOutsideTheContractKeepsItsReason() throws Exception {
+    public void evidenceIsLimitedToTheRefsThatWereSent() throws Exception {
         serve(200, geminiReply(analysisJson("X9", "baixa"), "STOP"));
         JSONObject response = AnalysisClient.analyze(settings(AiProvider.GEMINI, ""), KEY, request());
-        try {
-            AnalysisResult.parse(response, new HashSet<>(Arrays.asList("D1")));
-            fail();
-        } catch (JSONException e) {
-            assertEquals("A IA citou uma evidência que não foi enviada: X9", AnalysisClient.userMessage(e));
-        }
+        JSONObject items = new JSONObject(requestBody).getJSONObject("generationConfig").getJSONObject("responseJsonSchema")
+                .getJSONObject("properties").getJSONObject("hypotheses").getJSONObject("items")
+                .getJSONObject("properties").getJSONObject("evidence").getJSONObject("items");
+        assertEquals("[\"D1\"]", items.getJSONArray("enum").toString());
+        AnalysisResult result = AnalysisResult.parse(response, new HashSet<>(Arrays.asList("D1")));
+        assertTrue(result.hypotheses.get(0).evidence.isEmpty());
+    }
+
+    @Test
+    public void pastedKeysLoseSpacesLineBreaksAndQuotes() {
+        assertEquals("AQ.abc-123_XYZ", AiSettings.cleanKey("  \"AQ.abc-\n123_XYZ\" \n"));
     }
 
     @Test

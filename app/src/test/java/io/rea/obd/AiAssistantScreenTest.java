@@ -127,7 +127,7 @@ public class AiAssistantScreenTest {
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500));
         View root = dialog.getWindow().getDecorView();
         assertNotNull(root.findViewWithTag("ai-question"));
-        assertNotNull(text(root, language.equals("en") ? "Send to AI" : "Enviar para a IA"));
+        assertNotNull(text(root, language.equals("en") ? "Send" : "Enviar"));
         File dir = new File("build/screenshots/assistant"); dir.mkdirs();
         Bitmap bitmap = Bitmap.createBitmap(root.getWidth(), root.getHeight(), Bitmap.Config.ARGB_8888);
         root.draw(new Canvas(bitmap));

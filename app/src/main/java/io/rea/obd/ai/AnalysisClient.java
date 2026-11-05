@@ -77,6 +77,18 @@ public final class AnalysisClient {
     public static JSONObject analyze(AiSettings settings, String key, JSONObject request) throws IOException, JSONException {
         JSONObject kase = AiPrompt.caseFor(request);
         String model = settings.modelOrDefault();
+        try {
+            return ask(settings, key, model, kase);
+        } catch (Failure failure) {
+            // A busy default model should not end the conversation: try the provider's lighter model once.
+            if (!OVERLOADED.equals(failure.getMessage()) || !settings.model.isEmpty()) {
+                throw failure;
+            }
+            return ask(settings, key, settings.provider.fallbackModel, kase);
+        }
+    }
+
+    private static JSONObject ask(AiSettings settings, String key, String model, JSONObject kase) throws IOException, JSONException {
         return settings.provider == AiProvider.CLAUDE ? claude(settings, key, model, kase) : gemini(key, model, kase);
     }
 
@@ -114,7 +126,7 @@ public final class AnalysisClient {
                         .put("parts", new JSONArray().put(new JSONObject().put("text", kase.toString())))))
                 .put("generationConfig", new JSONObject()
                         .put("responseMimeType", "application/json")
-                        .put("responseJsonSchema", AiPrompt.schema(false)));
+                        .put("responseJsonSchema", AiPrompt.schema(false, kase)));
         JSONObject reply = exchange(geminiBase + "/models/" + model + ":generateContent", "POST", geminiHeaders(key), body);
         JSONArray candidates = reply.optJSONArray("candidates");
         if (candidates == null || candidates.length() == 0) {
@@ -148,7 +160,7 @@ public final class AnalysisClient {
                 .put("system", AiPrompt.system(kase))
                 .put("messages", new JSONArray().put(new JSONObject().put("role", "user").put("content", kase.toString())))
                 .put("output_config", new JSONObject().put("format", new JSONObject()
-                        .put("type", "json_schema").put("schema", AiPrompt.schema(true))));
+                        .put("type", "json_schema").put("schema", AiPrompt.schema(true, kase))));
         JSONObject reply = exchange(claudeBase + "/messages", "POST", claudeHeaders(settings, key), body);
         String stop = reply.optString("stop_reason");
         if ("refusal".equals(stop)) {
@@ -168,7 +180,28 @@ public final class AnalysisClient {
         return AiPrompt.response(reply.optString("model", model), text.toString());
     }
 
+    /** Free tiers often answer 500/503 for a moment; one quiet retry hides most of those blips. Tests set it to 0. */
+    static int overloadRetries = 1;
+
     private static JSONObject exchange(String address, String method, Map<String, String> headers, JSONObject request) throws IOException, JSONException {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return exchangeOnce(address, method, headers, request);
+            } catch (Failure failure) {
+                if (attempt >= overloadRetries || !OVERLOADED.equals(failure.getMessage())) {
+                    throw failure;
+                }
+                try {
+                    Thread.sleep(1500L * (attempt + 1));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw failure;
+                }
+            }
+        }
+    }
+
+    private static JSONObject exchangeOnce(String address, String method, Map<String, String> headers, JSONObject request) throws IOException, JSONException {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
         try {
             connection.setConnectTimeout(15_000);

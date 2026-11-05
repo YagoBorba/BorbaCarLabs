@@ -42,11 +42,17 @@ public class AiConversationTest {
         assertEquals(0, first.turns().length()); assertEquals(1, other.turns().length());
     }
 
-    @Test public void boundsHistoryAndRejectsInventedEvidenceBeforeSaving() throws Exception {
+    @Test public void boundsHistoryAndNeverShowsInventedEvidence() throws Exception {
         AiConversation conversation = new AiConversation(context(), "bounded", 1, Collections.singleton("D1"));
         for (int i = 0; i < 12; i++) conversation.append("Pergunta " + i, answer("D1"));
         assertEquals(8, conversation.turns().length());
-        try { conversation.append("Pergunta", answer("X9")); fail(); } catch (AnalysisResult.ContractException expected) { }
+        conversation.append("Pergunta final", answer("X9"));
+        JSONArray turns = conversation.turns();
+        assertEquals(8, turns.length());
+        AnalysisResult last = AnalysisResult.parse(turns.getJSONObject(7).getJSONObject("response"), Collections.singleton("D1"));
+        assertTrue(last.hypotheses.get(0).evidence.isEmpty());
+        try { conversation.append("Sem resposta", new JSONObject().put("model", "m").put("analysis", new JSONObject().put("summary", " "))); fail(); }
+        catch (AnalysisResult.ContractException expected) { }
         assertEquals(8, conversation.turns().length());
     }
 
@@ -76,9 +82,11 @@ public class AiConversationTest {
         AiSettings.save(context(), AiProvider.GEMINI, "", "", "");
         assertEquals("AIza0123456789abcdefghij", AiSettings.load(context()).key());
         assertEquals(AiProvider.GEMINI.defaultModel, AiSettings.load(context()).modelOrDefault());
-        for (String[] bad : new String[][]{{"curta", ""}, {"AIza0123456789 abcdefghij", ""}, {"AIza0123456789abcdefghij", "../../etc"}}) {
+        for (String[] bad : new String[][]{{"curta", ""}, {"AIza0123456789ábcdefghij", ""}, {"AIza0123456789abcdefghij", "../../etc"}}) {
             try { AiSettings.save(context(), AiProvider.GEMINI, bad[0], bad[1], ""); fail(); } catch (IllegalArgumentException expected) { }
         }
+        AiSettings.save(context(), AiProvider.GEMINI, " AIza0123456789\nabcdefghij ", "", "");
+        assertEquals("AIza0123456789abcdefghij", AiSettings.load(context()).key());
         assertTrue(AiSettings.removeKey(context(), AiProvider.GEMINI));
         assertFalse(AiSettings.load(context()).configured());
         try { AiSettings.save(context(), AiProvider.GEMINI, "", "", ""); fail(); } catch (IllegalArgumentException expected) { }
