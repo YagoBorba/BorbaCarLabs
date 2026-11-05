@@ -1368,7 +1368,7 @@ public final class MainActivity extends Activity {
         button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
-                        + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas. "
+                        + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas vão direto ao provedor que você escolheu (Gemini ou Claude), com a sua chave de API. "
                         + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados. "
                         + "Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços digitados ali não são detectados.\n\n"
                         + "Relatórios só saem quando você escolhe onde salvar ou compartilhar. Para apagar tudo: Configurações do Android › Apps › BorbaCar Labs › Limpar dados."));
