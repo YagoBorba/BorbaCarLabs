@@ -61,13 +61,27 @@ public class AiConversationTest {
         assertTrue(prompt.contains("demonstration_data"));
     }
 
-    @Test public void parsesInvitationsWithoutAllowingUserInfoOrTokenInTheQuery() {
-        String[] parts = AiSettings.invitation("http://192.168.0.2:8787/#0123456789abcdef");
-        assertEquals("0123456789abcdef", parts[1]);
-        assertTrue(AiSettings.valid(parts[0], parts[1]));
-        assertFalse(AiSettings.valid("http://user:pass@host", parts[1]));
-        assertFalse(AiSettings.valid("file:///etc/passwd", parts[1]));
-        assertFalse(AiSettings.valid("http://host/?token=secret", parts[1]));
-        assertFalse(AiSettings.valid(parts[0], "0123456789abcdef\r\nInjected"));
+    @Test public void keepsOneEncryptedKeyPerProviderAndRejectsBadInput() throws Exception {
+        KeyVault.backend = TestVault.INSTANCE;
+        AiSettings.save(context(), AiProvider.CLAUDE, "sk-ant-api03-0123456789abcdef", "", "");
+        AiSettings.save(context(), AiProvider.GEMINI, "AIza0123456789abcdefghij", "gemini-3.5-flash-lite", "");
+        AiSettings gemini = AiSettings.load(context());
+        assertEquals(AiProvider.GEMINI, gemini.provider);
+        assertTrue(gemini.configured());
+        assertEquals("AIza0123456789abcdefghij", gemini.key());
+        assertEquals("ghij", gemini.keyHint());
+        assertEquals("sk-ant-api03-0123456789abcdef", AiSettings.load(context(), AiProvider.CLAUDE).key());
+        String stored = context().getSharedPreferences("ai", Context.MODE_PRIVATE).getAll().toString();
+        assertFalse("a chave não pode ficar em texto puro", stored.contains("AIza0123456789abcdefghij"));
+        AiSettings.save(context(), AiProvider.GEMINI, "", "", "");
+        assertEquals("AIza0123456789abcdefghij", AiSettings.load(context()).key());
+        assertEquals(AiProvider.GEMINI.defaultModel, AiSettings.load(context()).modelOrDefault());
+        for (String[] bad : new String[][]{{"curta", ""}, {"AIza0123456789 abcdefghij", ""}, {"AIza0123456789abcdefghij", "../../etc"}}) {
+            try { AiSettings.save(context(), AiProvider.GEMINI, bad[0], bad[1], ""); fail(); } catch (IllegalArgumentException expected) { }
+        }
+        assertTrue(AiSettings.removeKey(context(), AiProvider.GEMINI));
+        assertFalse(AiSettings.load(context()).configured());
+        try { AiSettings.save(context(), AiProvider.GEMINI, "", "", ""); fail(); } catch (IllegalArgumentException expected) { }
+        try { AiSettings.load(context()).key(); fail(); } catch (AnalysisClient.Failure expected) { }
     }
 }
