@@ -2,8 +2,6 @@
 build/
 app/build/
 local.properties
-server/node_modules/
-server/.env
 keystore.properties
 *.jks
 *.keystore
@@ -11,7 +9,7 @@ keystore.properties
 *.iml
 .DS_Store
 *.apk
-server/usage.json
 
-server/.env.*
-server/evaluation-result.json
+# Leftovers from the removed local AI server; they can hold API keys
+server/
+CONVITE-IA.txt
