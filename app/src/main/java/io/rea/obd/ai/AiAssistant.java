@@ -133,7 +133,7 @@ public final class AiAssistant implements AutoCloseable {
         worker.execute(() -> {
             String failure = "";
             try {
-                JSONObject response = AnalysisClient.analyze(settings.serverUrl, settings.token, request);
+                JSONObject response = AnalysisClient.analyze(settings, settings.key(), request);
                 conversation.append(draft, response);
             } catch (Exception e) { failure = I18n.t(AnalysisClient.userMessage(e)); }
             final String problem = failure;
