@@ -86,6 +86,8 @@ public final class JournalController {
         }
     }
 
+    public boolean canBackup() { return ready && !saving && pendingExport == null; }
+
     public Glance glance(VehicleProfile vehicle) {
         if (!this.ready || vehicle == null) {
             return null;
@@ -105,7 +107,7 @@ public final class JournalController {
                 lastFill = entry;
             }
         }
-        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id), lastFill == null ? "" : lastFill.fuel, odometer);
+        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id, WallClock.today()), lastFill == null ? "" : lastFill.fuel, odometer);
     }
 
     public interface Host {
@@ -240,12 +242,12 @@ public final class JournalController {
         LinearLayout disclosure = uiKit.disclosure(linearLayout, "Opções do diário");
         uiKit.button(disclosure, "Exportar diário deste veículo", false, () -> this.exportVehicle(vehicle)).setEnabled((vehicle == null || !this.entries.stream().anyMatch((obj) -> ((JournalEntry) obj).vehicleId.equals(vehicle.id)) || this.saving) ? false : true);
         uiKit.button(disclosure, "Diários de perfis removidos", false, () -> this.detached()).setEnabled(this.entries.stream().anyMatch((obj) -> this.isDetached((JournalEntry) obj)));
-        uiKit.label(disclosure, "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Restaurar backup ainda não faz parte deste diário.", 12, UiKit.MUTED, false);
+        uiKit.label(disclosure, "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Backup completo e restauração estão em Ajustes.", 12, UiKit.MUTED, false);
     }
 
     private void summary(UiKit uiKit, LinearLayout linearLayout, VehicleProfile vehicle) {
         FuelSummary fuel = FuelSummary.latest(this.entries, vehicle.id);
-        JournalEntry reminder = MaintenanceReminders.next(this.entries, vehicle.id);
+        JournalEntry reminder = MaintenanceReminders.next(this.entries, vehicle.id, WallClock.today());
         JournalEntry last = null;
         for (JournalEntry entry : this.entries) {
             if (entry.vehicleId.equals(vehicle.id) && !entry.voided && (last == null || entry.occurredAt > last.occurredAt)) {

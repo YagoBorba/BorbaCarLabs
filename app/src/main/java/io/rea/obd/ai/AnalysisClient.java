@@ -46,17 +46,28 @@ public final class AnalysisClient {
     }
 
     public static JSONObject analyze(String serverUrl, String token, JSONObject request) throws IOException, JSONException {
-        URL url = new URL(serverUrl.replaceAll("/+$", "") + "/v1/analyze");
+        return exchange(serverUrl, token, "/v1/analyze", request);
+    }
+
+    public static JSONObject status(String serverUrl, String token) throws IOException, JSONException {
+        return exchange(serverUrl, token, "/v1/status", null);
+    }
+
+    private static JSONObject exchange(String serverUrl, String token, String path, JSONObject request) throws IOException, JSONException {
+        URL url = new URL(serverUrl.replaceAll("/+$", "") + path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
             connection.setConnectTimeout(10_000);
             connection.setReadTimeout(120_000);
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
+            connection.setInstanceFollowRedirects(false);
+            connection.setRequestMethod(request == null ? "GET" : "POST");
+            connection.setDoOutput(request != null);
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setRequestProperty("Authorization", "Bearer " + token);
-            try (OutputStream output = connection.getOutputStream()) {
-                output.write(request.toString().getBytes(StandardCharsets.UTF_8));
+            if (request != null) {
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(request.toString().getBytes(StandardCharsets.UTF_8));
+                }
             }
             int status = connection.getResponseCode();
             String body = read(status < 400 ? connection.getInputStream() : connection.getErrorStream());

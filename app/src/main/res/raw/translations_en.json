@@ -1274,7 +1274,25 @@
   "Você pode completar os detalhes restantes quando precisar.": "You can complete the remaining details when needed.",
   "Volkswagen Group of America; hospedado por NHTSA": "Volkswagen Group of America; hosted by NHTSA",
   "Voltar": "Back",
-  "Voltar ao diagnóstico": "Back to diagnosis"
+  "Voltar ao diagnóstico": "Back to diagnosis",
+  "Conversar com a IA": "Talk to AI",
+  "Não foi possível abrir o assistente: ": "Could not open the assistant: ",
+  "Quilometragem atingida": "Mileage reached",
+  "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Backup completo e restauração estão em Ajustes.": "Services with a date or mileage become reminders: they show on Today and send a notification 7 days or 500 km before they are due, if reminders are on in Settings. Logging the same service again without a new due date completes the reminder. Restoring a backup is not part of this journal yet.",
+  "Use uma pergunta de 1 a 500 caracteres.": "Use a question of 1 to 500 characters.",
+  "Convite inválido. Copie o endereço completo exibido pelo servidor.": "Invalid invitation. Copy the complete address displayed by the server.",
+  "Limite de conversas locais atingido. Limpe uma conversa antes de enviar.": "Local conversation limit reached. Clear a conversation before sending.",
+  "Limite de conversas locais atingido. Limpe uma conversa antes de salvar outra.": "Local conversation limit reached. Clear a conversation before saving another.",
+  "Não foi possível guardar a conversa.": "Could not save the conversation.",
+  "Não foi possível limpar a conversa.": "Could not clear the conversation.",
+  "Não foi possível apagar a conversa.": "Could not delete the conversation.",
+  "Arquivo indisponível.": "File unavailable.",
+  "Backup excede 8 MB.": "Backup exceeds 8 MB.",
+  "Formato de backup desconhecido.": "Unknown backup format.",
+  "Backup alterado ou incompleto.": "Backup is modified or incomplete.",
+  "Backup com registros demais.": "Backup contains too many records.",
+  "Não foi possível restaurar os perfis.": "Could not restore the profiles.",
+  "Registro local com integridade inválida; backup cancelado.": "A local record failed its integrity check; backup cancelled."
  },
  "patterns": [
   [
@@ -2452,6 +2470,10 @@
   [
    "Android (\\d.*)",
    "Android $1"
+  ],
+  [
+   "(\\d+) perfis · (\\d+) revisões de investigações · (\\d+) revisões do diário",
+   "$1 profiles · $2 case revisions · $3 journal revisions"
   ]
  ]
 }

@@ -20,7 +20,24 @@ public final class AiSettings {
     }
 
     public boolean configured() {
-        return this.serverUrl.matches("https?://\\S+") && this.token.length() >= 16;
+        return valid(this.serverUrl, this.token);
+    }
+
+    public static boolean valid(String address, String token) {
+        try {
+            java.net.URI uri = new java.net.URI(address);
+            return ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) && uri.getHost() != null
+                    && uri.getUserInfo() == null && uri.getQuery() == null && uri.getFragment() == null
+                    && token.length() >= 16 && token.length() <= 256 && !token.matches("(?s).*\\s.*");
+        } catch (Exception e) { return false; }
+    }
+
+    public static String[] invitation(String text) {
+        String[] parts = text.trim().split("#", -1);
+        if (parts.length != 2 || !valid(parts[0], parts[1])) {
+            throw new IllegalArgumentException("Convite inválido. Copie o endereço completo exibido pelo servidor.");
+        }
+        return parts;
     }
 
     public static boolean save(Context context, String serverUrl, String token) {

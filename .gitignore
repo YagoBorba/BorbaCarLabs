@@ -12,3 +12,6 @@ keystore.properties
 .DS_Store
 *.apk
 server/usage.json
+
+server/.env.*
+server/evaluation-result.json

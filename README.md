@@ -52,6 +52,12 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 
 </div>
 
+<details><summary>Academic AI assistant (Robolectric screen)</summary>
+
+<img src="docs/screens/assistant-pt.png" width="320" alt="Case-scoped AI assistant in Portuguese" />
+
+</details>
+
 ## What Can BorbaCar Labs Do?
 
 - **Adapter Connection:**
@@ -67,10 +73,10 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
     Cases with declared symptoms, revisions, an offline rules engine, a verification checklist and traceable JSON, TXT and PDF reports.
 
 - **Garage & Vehicle Catalog:**
-    516 versions, 225 models and 34 brands from model year 2019, extracted from the official Inmetro PBE Veicular table with a source for every attribute.
+    9,362 configurations from 43 brands in the bundled 2012–2026 PBE catalog, extracted from the official Inmetro PBE Veicular table with a source for every attribute.
 
 - **Trouble Code Catalog:**
-    91 generic P0 codes with meaning and source; any other code is described by its system area following SAE J2012.
+    117 generic P0/U0 codes with meaning and source; any other code is described by its system area following SAE J2012.
 
 - **Car Journal:**
     Fill-ups, services and symptoms, with tank-to-tank fuel economy compared to the official Inmetro figures for the selected version.
@@ -79,7 +85,7 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
     Daily notification when a service logged in the journal is within 7 days or 500 km of being due.
 
 - **AI Analysis (demo):**
-    Hypotheses that cite the case evidence, through a small Node.js server that keeps the API key off the phone (Claude by default, Gemini for free testing).
+    Case-scoped conversations, suggested questions, reviewed sharing with the user’s preferred AI, and an optional Node.js server for Gemini or Claude. API credentials stay off the phone. The offline guide is labeled as rules, not AI.
 
 - **Demo Mode:**
     Explore every screen without a car, with simulated data clearly marked.
@@ -91,11 +97,13 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 
 - **[Java 17](https://openjdk.org/) & [Android SDK](https://developer.android.com/):** Native app with views built in code, min SDK 26 and target SDK 35.
 - **[ELM327](https://www.elmelectronics.com/) over SPP, BLE and TCP:** Transport layer for the adapter, isolated behind `ElmTransport`.
-- **[SQLite](https://developer.android.com/training/data-storage/sqlite):** Local storage for diagnostic cases and the journal; nothing leaves the device unless the user exports it.
+- **[SQLite](https://developer.android.com/training/data-storage/sqlite):** Local storage for diagnostic cases and the journal; external sharing and AI requests require an explicit user action.
 - **[PdfDocument](https://developer.android.com/reference/android/graphics/pdf/PdfDocument):** Paginated PDF reports with sections and a simulated-data banner.
 - **[JUnit 4](https://junit.org/junit4/) & [Robolectric](https://robolectric.org/):** JVM tests for the OBD stack and screen tests with the real `MainActivity`.
 - **[Node.js](https://nodejs.org/):** AI proxy server with the [Anthropic](https://docs.anthropic.com/) and [Google Gen AI](https://ai.google.dev/) SDKs.
 - **[GitHub Actions](https://github.com/features/actions) & [Dependabot](https://docs.github.com/en/code-security/dependabot):** Build, tests, lint, signed releases and dependency updates.
+
+**Development snapshot:** academic AI conversations and restorable backups are in development; the release badge refers to the last published version. Backups include garage, readings, case revisions and journal, with validation, undo and crash recovery. They exclude credentials, settings, CSV and AI conversations.
 
 ## Architecture
 
@@ -149,15 +157,15 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 ./gradlew testDebugUnitTest lintDebug
 ```
 
-### 4. Start the AI server (optional)
+### 4. Connect AI for the academic presentation (optional)
 
-```bash
-cd server
-npm ci
-npm start
-```
+On Windows, run `./start-ai.ps1` in the repository root. The first run offers a setup wizard for your provider API key, generates the app token, and starts the server. Paste the invitation shown in the terminal into **Settings → AI analysis → Server invitation**, then test the connection. Keep the invitation private.
 
-See [server/README.md](server/README.md) for the environment variables. API keys are set on the machine running the server and never stored in the app or in the repository.
+On other systems: `cd server`, `npm ci`, `npm run setup`, `npm start`. API access can consume credits or quotas; a personal chat subscription is separate from API access.
+
+Choose **Talk to AI** directly from a reading: the app saves or reuses its case. You can also open the assistant from a saved investigation. Each question has a review step. **Use my AI** shares a minimized prompt through Android without requiring a server. **Offline guide · no AI** works without a model.
+
+See [the academic protocol and five-minute demo](docs/TRABALHO-ACADEMICO.md) and [server setup](server/README.md).
 
 ### 5. Signed release
 
@@ -219,8 +227,8 @@ docs/               demo script, privacy notice, screenshots and project history
 
 - Generic OBD-II emissions diagnostics only; ABS, airbag and manufacturer-specific modules are not read.
 - Code meanings only for codes in the catalog; other codes show their system area with no presumed cause.
-- The AI suggests possibilities, not a diagnosis; its answer is not saved in the case and never changes rules or reports.
-- The AI server is meant for local network demos (HTTP, daily counter kept in memory).
+- The AI suggests possibilities, not a diagnosis. Up to eight turns per case revision are stored separately on the device; replies never change diagnostic facts, rules or reports.
+- The AI server is meant for local network demos (HTTP, persistent daily quota for a single server process).
 - Not yet verified on a real car and adapter, or PDF rendering on a physical device.
 
 ## Documentation
@@ -228,6 +236,8 @@ docs/               demo script, privacy notice, screenshots and project history
 | Document | Content |
 |---|---|
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [Academic protocol](docs/TRABALHO-ACADEMICO.md) | AI setup, methodology, evaluation and presentation |
+| [Physical validation checklist](docs/ENSAIO-FISICO.md) | Pending real-device and adapter validation |
 | [docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md) | Demo script |
 | [docs/PRIVACIDADE.md](docs/PRIVACIDADE.md) | Privacy notice (LGPD) |
 | [docs/historico/](docs/historico/README.md) | Master plan, architecture, contracts, catalogs and validation of every version since 0.3.0 |

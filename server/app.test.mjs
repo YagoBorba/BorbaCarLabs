@@ -40,7 +40,7 @@ async function start(analyze, { limit = 5, timeoutMs = 1000 } = {}) {
       body: typeof body === "string" ? body : JSON.stringify(body),
     }).then(async (res) => ({ status: res.status, body: await res.json() }));
   const health = () => fetch(`${base}/health`).then((res) => res.json());
-  return { post, health, quota };
+  return { post, health, quota, base };
 }
 
 function answering(answer) {
@@ -171,4 +171,34 @@ test("unknown routes answer 404", async () => {
   const res = await fetch(`http://127.0.0.1:${servers.at(-1).address().port}/v1/other`);
   assert.equal(res.status, 404);
   assert.equal((await app.health()).ok, true);
+});
+
+test("follow-up questions carry bounded conversation without becoming observations", async () => {
+  let received;
+  const app = await start(async (kase, attempt) => { received = kase; return answering(ANSWER)(kase, attempt); });
+  const res = await app.post({ ...CASE, question: "O que falta?", conversation: [{ question: "O que significa?", answer: "Uma hipótese." }] });
+  assert.equal(res.status, 200);
+  assert.equal(received.question, "O que falta?");
+  assert.equal(received.conversation.length, 1);
+  assert.deepEqual(received.observations, CASE.observations);
+});
+
+test("invalid conversation and duplicate refs do not consume quota", async () => {
+  const app = await start(answering(ANSWER));
+  for (const extra of [{ question: "x".repeat(501) }, { conversation: Array(7).fill({ question: "x", answer: "y" }) },
+      { conversation: [{ question: "x", answer: 42 }] }, { observations: [CASE.observations[0], CASE.observations[0]] }]) {
+    assert.equal((await app.post({ ...CASE, ...extra })).status, 400);
+  }
+  assert.equal(app.quota.remaining(), 5);
+});
+
+test("connection test requires the token and never calls the provider", async () => {
+  let calls = 0;
+  const app = await start(async () => { calls++; throw new Error("not expected"); });
+  assert.equal((await fetch(app.base + "/v1/status")).status, 401);
+  const status = await fetch(app.base + "/v1/status", { headers: { Authorization: "Bearer " + TOKEN } });
+  assert.equal(status.status, 200);
+  assert.equal((await status.json()).conversation, true);
+  assert.equal(calls, 0);
+  assert.equal(app.quota.remaining(), 5);
 });

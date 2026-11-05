@@ -56,13 +56,41 @@ public final class MaintenanceReminders {
     }
 
     public static JournalEntry next(List<JournalEntry> entries, String vehicleId) {
+        return next(entries, vehicleId, LocalDate.now());
+    }
+
+    public static JournalEntry next(List<JournalEntry> entries, String vehicleId, LocalDate today) {
+        BigDecimal odometer = odometer(entries, vehicleId);
         JournalEntry next = null;
         for (JournalEntry entry : active(entries)) {
-            if (entry.vehicleId.equals(vehicleId) && (next == null || sooner(entry, next))) {
+            if (entry.vehicleId.equals(vehicleId) && (next == null || priority(entry, today, odometer) < priority(next, today, odometer)
+                    || (priority(entry, today, odometer) == priority(next, today, odometer) && sooner(entry, next)))) {
                 next = entry;
             }
         }
         return next;
+    }
+
+    public static BigDecimal odometer(List<JournalEntry> entries, String vehicleId) {
+        BigDecimal result = null;
+        for (JournalEntry entry : entries) {
+            if (!entry.voided && entry.vehicleId.equals(vehicleId) && entry.odometer != null) {
+                result = result == null ? entry.odometer : result.max(entry.odometer);
+            }
+        }
+        return result;
+    }
+
+    public static boolean overdue(JournalEntry entry, LocalDate today, BigDecimal odometer) {
+        return (!entry.dueDate.isEmpty() && LocalDate.parse(entry.dueDate).isBefore(today))
+                || (entry.dueOdometer != null && odometer != null && entry.dueOdometer.compareTo(odometer) <= 0);
+    }
+
+    private static int priority(JournalEntry entry, LocalDate today, BigDecimal odometer) {
+        if (overdue(entry, today, odometer)) return 0;
+        if ((!entry.dueDate.isEmpty() && !LocalDate.parse(entry.dueDate).isAfter(today.plusDays(DAYS_AHEAD)))
+                || (entry.dueOdometer != null && odometer != null && entry.dueOdometer.subtract(odometer).compareTo(KM_AHEAD) <= 0)) return 1;
+        return 2;
     }
 
     private static boolean sooner(JournalEntry a, JournalEntry b) {
