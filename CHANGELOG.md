@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 / Everyday use and AI chat — 2026-11-05
 
 - Friendlier AI chat: questions and replies appear as chat bubbles, each reply answers the question directly in plain language, and possible causes, missing information and what to check sit in a collapsible section under the reply. Suggestions send with one tap and change after the first answer. The raw JSON preview before every request was replaced by a plain-language notice shown once per provider ("See the data sent to the AI" stays in More options). Errors appear in the chat with "Try again" or "Set up the key".
 - AI replies no longer fail when the model writes text instead of a reference in a hypothesis: the response schema lists the refs that were sent, and anything else is dropped from the reply instead of discarding it. Overlong lists are trimmed.
