@@ -99,13 +99,30 @@ public class AnalysisContractTest {
     }
 
     @Test
-    public void rejectsInventedEvidence() throws JSONException {
-        try {
-            AnalysisResult.parse(answer("X9", "alta"), request().refs());
-            fail("evidence that was never sent must be rejected");
-        } catch (JSONException expected) {
-            assertTrue(expected.getMessage().contains("X9"));
-        }
+    public void dropsInventedEvidenceButKeepsTheAnswer() throws JSONException {
+        AnalysisRequest request = request();
+        AnalysisResult result = AnalysisResult.parse(answer("X9", "alta"), request.refs());
+        assertEquals("Resumo", result.summary);
+        assertEquals(1, result.hypotheses.size());
+        assertTrue(result.hypotheses.get(0).evidence.isEmpty());
+        assertFalse(result.display(request.labels).contains("X9"));
+        assertFalse(result.display(request.labels).contains("Evidências"));
+    }
+
+    @Test
+    public void proseInsteadOfRefsAndOverlongListsAreTrimmed() throws JSONException {
+        JSONObject reply = answer("T1", "media");
+        JSONObject analysis = reply.getJSONObject("analysis");
+        JSONArray hypotheses = analysis.getJSONArray("hypotheses");
+        hypotheses.getJSONObject(0).getJSONArray("evidence").put("Código P0301 no cilindro 1");
+        for (int i = 0; i < 6; i++) hypotheses.put(new JSONObject(hypotheses.getJSONObject(0).toString()));
+        for (int i = 0; i < 10; i++) analysis.getJSONArray("missing_information").put("Item " + i);
+        AnalysisResult result = AnalysisResult.parse(reply, request().refs());
+        assertEquals(5, result.hypotheses.size());
+        assertEquals(java.util.Collections.singletonList("T1"), result.hypotheses.get(0).evidence);
+        assertEquals(8, result.missing.size());
+        assertTrue(result.hasDetails());
+        assertFalse(result.details(request().labels).startsWith("Resumo"));
     }
 
     @Test(expected = JSONException.class)

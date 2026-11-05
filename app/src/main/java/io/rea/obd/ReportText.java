@@ -6,6 +6,7 @@ import io.rea.obd.knowledge.DtcCatalog;
 import io.rea.obd.knowledge.DtcDefinition;
 import io.rea.obd.knowledge.DtcReference;
 import io.rea.obd.knowledge.SourceReference;
+import io.rea.obd.ui.I18n;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -38,6 +39,7 @@ public final class ReportText {
             String offset = ZonedDateTime.now(zone).getOffset().getId().replace("Z", "+00:00");
             out.add(1, "Horários no fuso do aparelho (UTC" + offset + ").");
         }
+        out.replaceAll(I18n::t);
         return out;
     }
 

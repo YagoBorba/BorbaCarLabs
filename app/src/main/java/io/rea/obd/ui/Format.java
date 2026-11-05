@@ -16,10 +16,10 @@ public final class Format {
     }
 
     public static String when(long epochMillis) {
-        ZoneId zone = ZoneId.systemDefault();
+        ZoneId zone = WallClock.zone();
         ZonedDateTime time = Instant.ofEpochMilli(epochMillis).atZone(zone);
         LocalDate day = time.toLocalDate();
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = WallClock.today();
         String clock = time.format(TIME);
         if (day.equals(today)) {
             return "hoje às " + clock;
@@ -31,7 +31,7 @@ public final class Format {
     }
 
     public static String clock(long epochMillis) {
-        return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(TIME_SECONDS);
+        return Instant.ofEpochMilli(epochMillis).atZone(WallClock.zone()).format(TIME_SECONDS);
     }
 
     public static String count(int n, String singular, String plural) {
@@ -39,16 +39,17 @@ public final class Format {
     }
 
     public static String km(java.math.BigDecimal dueOdometer) {
-        java.text.NumberFormat format = java.text.NumberFormat.getIntegerInstance(new java.util.Locale("pt", "BR"));
+        java.text.NumberFormat format = java.text.NumberFormat.getIntegerInstance(I18n.locale());
         return format.format(dueOdometer) + " km";
     }
 
     public static String decimal(java.math.BigDecimal bigDecimal) {
-        return bigDecimal.toPlainString().replace('.', ',');
+        return I18n.english() ? bigDecimal.toPlainString() : bigDecimal.toPlainString().replace('.', ',');
     }
 
     public static String money(java.math.BigDecimal bigDecimal) {
-        java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("pt", "BR"));
+        java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance(I18n.locale());
+        format.setCurrency(java.util.Currency.getInstance("BRL"));
         return format.format(bigDecimal).replace(' ', ' ');
     }
 }

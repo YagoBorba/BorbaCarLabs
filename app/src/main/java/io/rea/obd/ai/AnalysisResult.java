@@ -49,51 +49,68 @@ public final class AnalysisResult {
         this.safetyNote = safetyNote;
     }
 
+    /**
+     * Reads a stored or fresh reply. The answer itself must be present; extras the model got slightly
+     * wrong are trimmed instead of throwing the whole reply away. Evidence that was never sent is
+     * dropped, so the app never shows a reference it did not collect.
+     */
     public static AnalysisResult parse(JSONObject response, Set<String> refs) throws JSONException {
         String model = text(response, "model", 80, false);
         JSONObject analysis = response.getJSONObject("analysis");
-        String summary = text(analysis, "summary", 1200, false);
+        String summary = text(analysis, "summary", 2000, false);
 
-        JSONArray hypotheses2 = analysis.getJSONArray("hypotheses");
-        if (hypotheses2.length() > 5) {
-            throw new ContractException("Resposta da IA com hipóteses demais");
-        }
+        JSONArray hypotheses2 = analysis.optJSONArray("hypotheses");
         List<Hypothesis> hypotheses = new ArrayList<>();
-        for (int i = 0; i < hypotheses2.length(); i++) {
-            JSONObject item = hypotheses2.getJSONObject(i);
-            JSONArray cited = item.getJSONArray("evidence");
-            if (cited.length() == 0) {
-                throw new ContractException("Hipótese da IA sem evidência citada");
+        for (int i = 0; hypotheses2 != null && i < hypotheses2.length() && hypotheses.size() < 5; i++) {
+            JSONObject item = hypotheses2.optJSONObject(i);
+            if (item == null || item.optString("title").trim().isEmpty()) {
+                continue;
             }
+            JSONArray cited = item.optJSONArray("evidence");
             List<String> evidence = new ArrayList<>();
-            for (int i2 = 0; i2 < cited.length(); i2++) {
-                String ref = cited.getString(i2);
-                if (!refs.contains(ref)) {
-                    throw new ContractException("A IA citou uma evidência que não foi enviada: " + ref);
+            for (int i2 = 0; cited != null && i2 < cited.length(); i2++) {
+                String ref = cited.optString(i2).trim();
+                if (refs.contains(ref) && !evidence.contains(ref)) {
+                    evidence.add(ref);
                 }
-                evidence.add(ref);
             }
-            String confidence = item.getString("confidence");
+            String confidence = item.optString("confidence");
             if (!CONFIDENCE.contains(confidence)) {
                 throw new ContractException("Confiança fora do contrato: " + confidence);
             }
             hypotheses.add(new Hypothesis(
-                    text(item, "title", 160, false),
-                    text(item, "reasoning", 1200, false),
+                    clip(item.getString("title"), 160),
+                    clip(item.optString("reasoning"), 1200),
                     evidence,
                     confidence,
-                    text(item, "next_check", 600, true)));
+                    clip(item.optString("next_check"), 600)));
         }
 
-        JSONArray gaps = analysis.getJSONArray("missing_information");
-        if (gaps.length() > 8) {
-            throw new ContractException("Resposta da IA com lacunas demais");
-        }
+        JSONArray gaps = analysis.optJSONArray("missing_information");
         List<String> missing = new ArrayList<>();
-        for (int i = 0; i < gaps.length(); i++) {
-            missing.add(bounded(gaps.getString(i), 300));
+        for (int i = 0; gaps != null && i < gaps.length() && missing.size() < 8; i++) {
+            String gap = clip(gaps.optString(i), 300);
+            if (!gap.isEmpty()) {
+                missing.add(gap);
+            }
         }
-        return new AnalysisResult(model, summary, hypotheses, missing, text(analysis, "safety_note", 600, true));
+        return new AnalysisResult(model, summary, hypotheses, missing, clip(analysis.optString("safety_note"), 600));
+    }
+
+    /** True when there is more than the answer itself to show. */
+    public boolean hasDetails() {
+        return !this.hypotheses.isEmpty() || !this.missing.isEmpty();
+    }
+
+    /** Possible causes and missing information, without the answer or the safety note (shown separately in the chat). */
+    public String details(Map<String, String> labels) {
+        String full = new AnalysisResult(this.model, "", this.hypotheses, this.missing, "").display(labels);
+        return full.trim();
+    }
+
+    private static String clip(String text, int max) {
+        String clean = text == null ? "" : text.trim();
+        return clean.length() <= max ? clean : clean.substring(0, max - 1).trim() + "…";
     }
 
     public String display(Map<String, String> labels) {
@@ -102,13 +119,14 @@ public final class AnalysisResult {
             Hypothesis hypothesis = this.hypotheses.get(i);
             out.append("\n\n").append(i + 1).append(". ").append(hypothesis.title)
                     .append(" · confiança ").append(hypothesis.confidence.equals("media") ? "média" : hypothesis.confidence)
-                    .append("\n").append(hypothesis.reasoning)
-                    .append("\nEvidências: ");
+                    .append("\n").append(hypothesis.reasoning);
             List<String> cited = new ArrayList<>();
             for (String ref : hypothesis.evidence) {
                 cited.add(labels.containsKey(ref) ? labels.get(ref) : ref);
             }
-            out.append(String.join("; ", cited));
+            if (!cited.isEmpty()) {
+                out.append("\nEvidências: ").append(String.join("; ", cited));
+            }
             if (!hypothesis.nextCheck.isEmpty()) {
                 out.append("\nPróxima verificação: ").append(hypothesis.nextCheck);
             }
@@ -130,13 +148,6 @@ public final class AnalysisResult {
         if (text.isEmpty() && !allowEmpty) {
             throw new ContractException("Campo vazio na resposta da IA: " + key);
         }
-        return bounded(text, max);
-    }
-
-    private static String bounded(String text, int max) throws JSONException {
-        if (text.length() > max) {
-            throw new ContractException("Texto longo demais na resposta da IA");
-        }
-        return text;
+        return clip(text, max);
     }
 }

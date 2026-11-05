@@ -49,7 +49,7 @@ public final class UiKit {
 
     public TextView label(LinearLayout linearLayout, String text, int i, int value, boolean flag) {
         TextView textView = new TextView(this.context);
-        textView.setText(text);
+        textView.setText(I18n.t(text));
         textView.setTextSize(i);
         textView.setTextColor(this.palette.color(value));
         textView.setTypeface(Typeface.create(flag ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
@@ -72,7 +72,7 @@ public final class UiKit {
 
     public Button button(LinearLayout linearLayout, String text, boolean flag, final Runnable runnable) {
         Button button = new Button(this.context);
-        button.setText(text);
+        button.setText(I18n.t(text));
         button.setAllCaps(false);
         button.setTextSize(15.0f);
         button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -89,7 +89,9 @@ public final class UiKit {
     }
 
     public void eyebrow(LinearLayout linearLayout, String category) {
-        label(linearLayout, category, 11, ACCENT, true).setLetterSpacing(0.12f);
+        TextView eyebrow = label(linearLayout, category, 11, ACCENT, true);
+        eyebrow.setLetterSpacing(0.12f);
+        eyebrow.setAllCaps(true);
     }
 
     public LinearLayout feature(LinearLayout linearLayout) {
@@ -106,13 +108,25 @@ public final class UiKit {
     }
 
     public void artwork(LinearLayout linearLayout, int heightDp) {
+        artwork(linearLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(heightDp)));
+    }
+
+    public void artwork(LinearLayout linearLayout, LinearLayout.LayoutParams layoutParams) {
         VehicleArtwork artwork = new VehicleArtwork(this.context);
-        artwork.setContentDescription("Ilustração genérica de um carro");
-        linearLayout.addView(artwork, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(heightDp)));
+        artwork.setContentDescription(I18n.t("Ilustração genérica de um carro"));
+        linearLayout.addView(artwork, layoutParams);
+    }
+
+    public TextView title(LinearLayout linearLayout, String text, int size) {
+        TextView title = label(linearLayout, text, size, TEXT, true);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            title.setAccessibilityHeading(true);
+        }
+        return title;
     }
 
     public void section(LinearLayout linearLayout, String text, String text2) {
-        label(linearLayout, text, 20, TEXT, true);
+        title(linearLayout, text, 20);
         if (text2 == null || text2.isEmpty()) {
             return;
         }
@@ -171,7 +185,7 @@ public final class UiKit {
         trailing(row, io.rea.obd.R.drawable.ic_expand);
         column.setVisibility(View.GONE);
         linearLayout.addView(column, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        row.setContentDescription(text + ". Recolhido");
+        row.setContentDescription(I18n.t(text + ". Recolhido"));
         row.setOnClickListener((view) -> {
             boolean flag = column.getVisibility() != View.VISIBLE;
             column.setVisibility(flag ? View.VISIBLE : View.GONE);
@@ -179,7 +193,7 @@ public final class UiKit {
             StringBuilder builder = new StringBuilder();
             builder.append(text);
             builder.append(flag ? ". Expandido" : ". Recolhido");
-            row.setContentDescription(builder.toString());
+            row.setContentDescription(I18n.t(builder.toString()));
             if (flag) {
                 Motion.enter(column);
             }

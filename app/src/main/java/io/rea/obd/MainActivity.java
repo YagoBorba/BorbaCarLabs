@@ -3,6 +3,7 @@ package io.rea.obd;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -28,6 +29,7 @@ import android.util.SparseIntArray;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -47,6 +49,7 @@ import io.rea.obd.diagnostics.DtcDemoScenario;
 import io.rea.obd.diagnostics.DtcFormatter;
 import io.rea.obd.diagnostics.DtcObservation;
 import io.rea.obd.diagnostics.DtcReadResult;
+import io.rea.obd.diagnostics.ReadingGuide;
 import io.rea.obd.diagnostics.SupplementalDemoScenario;
 import io.rea.obd.diagnostics.SupplementalFormatter;
 import io.rea.obd.diagnostics.SupplementalReadResult;
@@ -70,13 +73,16 @@ import io.rea.obd.ui.DiagnosisScreen;
 import io.rea.obd.ui.Format;
 import io.rea.obd.ui.GarageScreen;
 import io.rea.obd.ui.HomeScreen;
+import io.rea.obd.ui.I18n;
 import io.rea.obd.ui.JournalController;
+import io.rea.obd.ui.LocalizedDialog;
 import io.rea.obd.ui.Motion;
 import io.rea.obd.ui.NavigationState;
 import io.rea.obd.ui.Notice;
 import io.rea.obd.ui.ThemePalette;
 import io.rea.obd.ui.UiKit;
 import io.rea.obd.ui.VehicleEditor;
+import io.rea.obd.ui.WallClock;
 import io.rea.obd.vehicle.VehicleProfile;
 import io.rea.obd.vehicle.VehicleProfileReportV1;
 import io.rea.obd.vehicle.VehicleRecord;
@@ -90,14 +96,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -150,16 +154,32 @@ public final class MainActivity extends Activity {
     private File pendingCaseExport;
     private File pendingPdf;
     private TelemetryRecorder recorder;
+    private String[] pendingAdapter;
+    private int pollFailures;
     private TextView recordingBanner;
     private LinearLayout root;
-    private DataOrigin rpmHistoryOrigin;
+    private DataOrigin historyOrigin;
     private TextView scanView;
     private TextView statusView;
     private VehicleCatalogStore.Loaded vehicleCatalog;
+    private java.util.concurrent.Future<VehicleCatalogStore.Loaded> catalogLoad;
     private VehicleEfficiency efficiency;
 
+    private VehicleCatalogStore.Loaded catalog(boolean wait) {
+        java.util.concurrent.Future<VehicleCatalogStore.Loaded> load = this.catalogLoad;
+        if (this.vehicleCatalog == null && load != null && (wait || load.isDone())) {
+            try {
+                this.vehicleCatalog = load.get();
+            } catch (Exception e) {
+                this.vehicleCatalog = null;
+            }
+            this.catalogLoad = null;
+        }
+        return this.vehicleCatalog;
+    }
+
     private VehicleEfficiency.Official officialConsumption(VehicleProfile vehicle) {
-        if (vehicle == null || this.vehicleCatalog == null) {
+        if (vehicle == null || catalog(false) == null) {
             return null;
         }
         if (this.efficiency == null) {
@@ -189,7 +209,9 @@ public final class MainActivity extends Activity {
     private final Map<Integer, TextView> qualityViews = new HashMap();
     private final Map<Integer, TextView> valueViews = new HashMap();
     private final Map<Integer, TextView> extraViews = new HashMap();
-    private final List<ChartView.Point> rpmHistory = new ArrayList();
+    private final Map<Integer, List<ChartView.Point>> histories = new HashMap();
+    private final Map<Integer, Boolean> historyGaps = new HashMap();
+    private int expandedPid = 12;
     private String currentDtcAdapter = "";
     private final Map<Integer, DiagnosticCase.Sample> contextualSamples = new HashMap();
     private List<DiagnosticCase.Sample> currentCaseSamples = Collections.emptyList();
@@ -197,10 +219,9 @@ public final class MainActivity extends Activity {
     private List<JSONObject> caseDocuments = Collections.emptyList();
     private String caseWarning = "";
     private final SparseIntArray scrollPositions = new SparseIntArray();
-    private String rpmHistorySessionId = "";
+    private String historySessionId = "";
     private String recordingAcquisitionId = "";
-    private boolean rpmGap = true;
-    private final Set<Integer> selectedPids = new LinkedHashSet(Arrays.asList(12, 13, 5, 4, 17));
+    private final Set<Integer> selectedPids = new LinkedHashSet(Arrays.asList(12, 13, 5, 4, 17, 15));
     private boolean demo = false;
     private boolean busy = false;
     private boolean resumed = false;
@@ -228,7 +249,7 @@ public final class MainActivity extends Activity {
 
         @Override
         public long epochMillis() {
-            return System.currentTimeMillis();
+            return WallClock.millis();
         }
     };
     private final Runnable pollTask = () -> this.poll();
@@ -253,6 +274,7 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onCreate(Bundle bundle) {
+        I18n.init(this);
         ThemePalette themePalette = ThemePalette.of(this);
         setTheme(themePalette.style());
         this.BG = themePalette.bg;
@@ -263,6 +285,27 @@ public final class MainActivity extends Activity {
         this.ACCENT = themePalette.accent;
         this.AMBER = themePalette.attention;
         super.onCreate(bundle);
+        io.rea.obd.backup.BackupRepository recovery = new io.rea.obd.backup.BackupRepository(this, getPreferences(0));
+        if (recovery.hasPendingRestore()) {
+            recoveryBlocked = true;
+            android.widget.TextView warning = new android.widget.TextView(this);
+            warning.setPadding(32, 48, 32, 32);
+            warning.setText(I18n.english() ? "Recovering interrupted restore…" : "Recuperando restauração interrompida…");
+            setContentView(warning);
+            new Thread(() -> {
+                try {
+                    recovery.recoverInterruptedRestore();
+                    runOnUiThread(() -> { if (!isDestroyed()) recreate(); });
+                } catch (Exception failure) {
+                    runOnUiThread(() -> {
+                        if (!isDestroyed()) warning.setText(I18n.english()
+                            ? "Storage recovery could not finish. Free some space and restart. The recovery copy was preserved."
+                            : "A recuperação não pôde terminar. Libere espaço e reinicie. A cópia de recuperação foi preservada.");
+                    });
+                }
+            }, "backup-recovery").start();
+            return;
+        }
         themePalette.window(getWindow());
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(BluetoothManager.class);
         this.adapter = bluetoothManager == null ? null : bluetoothManager.getAdapter();
@@ -274,11 +317,17 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             this.storageWarning = "Garagem indisponível: " + error(e) + ". Os dados originais foram preservados.";
         }
-        try {
-            this.vehicleCatalog = new VehicleCatalogStore(this).load();
-        } catch (Exception ignored) {
-            this.vehicleCatalog = null;
-        }
+        java.util.concurrent.FutureTask<VehicleCatalogStore.Loaded> catalogLoad = new java.util.concurrent.FutureTask<>(() -> {
+            VehicleCatalogStore.Loaded loaded = new VehicleCatalogStore(this).load();
+            this.ui.post(() -> {
+                if (!this.destroyed && this.page == 4) {
+                    render();
+                }
+            });
+            return loaded;
+        });
+        this.catalogLoad = catalogLoad;
+        new Thread(catalogLoad, "vehicle-catalog").start();
         try {
             this.historyStore = new DiagnosticHistoryStore(getPreferences(0));
             refreshHistory();
@@ -349,6 +398,14 @@ public final class MainActivity extends Activity {
             }
 
             @Override
+            public void offerReminders() {
+                if (MainActivity.this.destroyed || ReminderReceiver.enabled(MainActivity.this)) {
+                    return;
+                }
+                new LocalizedDialog(MainActivity.this).setTitle("Ligar lembretes?").setMessage("O app avisa quando faltarem 7 dias ou 500 km para o próximo serviço. Você pode mudar isso em Ajustes.").setPositiveButton("Ligar lembretes", (dialog, which) -> MainActivity.this.toggleReminders()).setNegativeButton("Agora não", null).show();
+            }
+
+            @Override
             public Set<String> vehicleIds() {
                 HashSet seen = new HashSet();
                 if (MainActivity.this.vehicles != null) {
@@ -397,9 +454,12 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private boolean recoveryBlocked;
+
     @Override
     protected void onResume() {
         super.onResume();
+        if (recoveryBlocked) return;
         this.resumed = true;
         refreshValues();
         schedulePoll(200L);
@@ -408,6 +468,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (recoveryBlocked) { super.onPause(); return; }
         this.resumed = false;
         refreshValues();
         stopBleScan();
@@ -419,6 +480,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         this.destroyed = true;
+        if (aiAssistant != null) aiAssistant.close();
         JournalController journalController = this.journal;
         if (journalController != null) {
             journalController.close();
@@ -498,7 +560,7 @@ public final class MainActivity extends Activity {
 
     private TextView text(String text, int i, int textColor, boolean flag) {
         TextView textView = new TextView(this);
-        textView.setText(text);
+        textView.setText(I18n.t(text));
         textView.setTextSize(i);
         textView.setTextColor(textColor);
         textView.setFontFeatureSettings("tnum");
@@ -528,7 +590,7 @@ public final class MainActivity extends Activity {
     private void heading(String category, String text, String name) {
         UiKit uiKit = new UiKit(this);
         uiKit.eyebrow(this.body, category);
-        uiKit.label(this.body, text, 28, this.TEXT, true);
+        uiKit.title(this.body, text, 28);
         uiKit.label(this.body, name, 14, this.MUTED, false);
         gap(this.body, 12);
     }
@@ -567,37 +629,52 @@ public final class MainActivity extends Activity {
         }
         this.root.requestApplyInsets();
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation((getResources().getConfiguration().screenWidthDp < 360 || getResources().getConfiguration().fontScale > 1.3f) ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        boolean compactHeader = getResources().getConfiguration().screenWidthDp < 360 || getResources().getConfiguration().fontScale > 1.3f;
+        row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(22.0f), dp(16.0f), dp(22.0f), dp(12.0f));
+        row.setPadding(dp(22.0f), dp(compactHeader ? 8.0f : 16.0f), dp(22.0f), dp(compactHeader ? 4.0f : 12.0f));
         this.root.addView(row);
-        TextView label = text("BorbaCar Labs", 18, this.TEXT, true);
+        TextView label = text(compactHeader ? "" : "BorbaCar Labs", 18, this.TEXT, true);
         Drawable drawable = getDrawable(R.drawable.ic_brand);
         drawable.setBounds(0, 0, dp(30.0f), dp(30.0f));
         label.setCompoundDrawablesRelative(drawable, null, null, null);
-        label.setCompoundDrawablePadding(dp(10.0f));
-        row.addView(label, row.getOrientation() == LinearLayout.HORIZONTAL ? new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f) : new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        label.setCompoundDrawablePadding(dp(compactHeader ? 0.0f : 10.0f));
+        if (compactHeader) {
+            label.setContentDescription("BorbaCar Labs");
+        }
+        row.addView(label, compactHeader ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT) : new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
         if (this.demo) {
             text = "DEMONSTRAÇÃO";
         } else {
-            text = connected() ? "● CONECTADO" : "○ OFFLINE";
+            text = connected() ? "● CONECTADO" : "○ DESCONECTADO";
         }
         if (this.demo) {
             i = this.AMBER;
         } else {
             i = connected() ? this.ACCENT : this.MUTED;
         }
-        row.addView(text(text, 11, i, true));
+        TextView connection = text(text, 11, i, true);
+        connection.setContentDescription(I18n.t(this.demo ? "Modo demonstração" : connected() ? "Conectado ao adaptador" : "Sem conexão com o adaptador"));
+        if (compactHeader) {
+            connection.setPadding(dp(12.0f), 0, 0, 0);
+            row.addView(connection, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        } else {
+            row.addView(connection);
+        }
         TextView ajustes = text("Ajustes", 13, this.ACCENT, true);
         ajustes.setMinHeight(dp(48.0f));
         ajustes.setGravity(Gravity.CENTER);
         ajustes.setPadding(dp(12.0f), 0, 0, 0);
-        ajustes.setContentDescription("Ajustes e informações");
+        ajustes.setContentDescription(I18n.t("Ajustes e informações"));
         row.addView(ajustes);
         ajustes.setOnClickListener((view) -> navigate(3));
         if (this.demo) {
-            TextView label2 = text(this.page == 6 ? "MODO DEMONSTRAÇÃO · diário contém registros declarados" : "DADOS SIMULADOS · nenhum veículo está sendo consultado", 13, this.AMBER, true);
-            label2.setPadding(dp(22.0f), dp(4.0f), dp(22.0f), dp(10.0f));
+            String banner = this.page == 6 ? "MODO DEMONSTRAÇÃO · diário contém registros declarados" : "DADOS SIMULADOS · nenhum veículo está sendo consultado";
+            TextView label2 = text(compactHeader ? banner.substring(0, banner.indexOf(" · ")) : banner, 13, this.AMBER, true);
+            if (compactHeader) {
+                label2.setContentDescription(I18n.t(banner));
+            }
+            label2.setPadding(dp(22.0f), dp(compactHeader ? 0.0f : 4.0f), dp(22.0f), dp(compactHeader ? 6.0f : 10.0f));
             this.root.addView(label2);
         }
         if (this.recorder != null) {
@@ -631,7 +708,6 @@ public final class MainActivity extends Activity {
         }
         int page2 = this.page;
         if (page2 == 0) {
-            button(this.body, "Voltar ao diagnóstico", false, () -> navigate(1));
             dashboard();
         } else if (page2 == 1) {
             diagnostics();
@@ -650,7 +726,7 @@ public final class MainActivity extends Activity {
         this.nav = new LinearLayout(this);
         boolean stacked = getResources().getConfiguration().fontScale > 1.3f;
         this.nav.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        this.nav.setPadding(dp(12.0f), dp(10.0f), dp(12.0f), dp(10.0f));
+        this.nav.setPadding(dp(12.0f), dp(stacked ? 4.0f : 10.0f), dp(12.0f), dp(stacked ? 4.0f : 10.0f));
         this.nav.setBackgroundColor(this.CARD);
         this.root.addView(this.nav);
         String[] parts = {"Hoje", "Diagnóstico", "Histórico", "Garagem"};
@@ -665,23 +741,31 @@ public final class MainActivity extends Activity {
             }
             TextView label2 = text(parts[value4], value2, NavigationState.tab(this.page) == value4 ? this.ACCENT : this.MUTED, NavigationState.tab(this.page) == value4 ? focusable : false);
             label2.setGravity(Gravity.CENTER);
-            label2.setPadding(dp(2.0f), dp(10.0f), dp(2.0f), dp(10.0f));
+            label2.setPadding(dp(stacked ? 10.0f : 2.0f), dp(stacked ? 4.0f : 10.0f), dp(stacked ? 10.0f : 2.0f), dp(stacked ? 4.0f : 10.0f));
             label2.setBackground(ThemePalette.of(this).navigation(this, NavigationState.tab(this.page) == value4 ? focusable : false));
             Motion.press(label2);
             label2.setMinHeight(dp(48.0f));
-            label2.setContentDescription(parts[value4]);
+            label2.setContentDescription(I18n.t(parts[value4]));
             label2.setSelected(NavigationState.tab(this.page) == value4 ? focusable : false);
             label2.setFocusable(focusable);
             Drawable mutate = getDrawable(values[value4]).mutate();
             mutate.setTint(NavigationState.tab(this.page) == value4 ? this.ACCENT : this.MUTED);
             mutate.setBounds(0, 0, dp(22.0f), dp(22.0f));
-            label2.setCompoundDrawables(null, mutate, null, null);
+            if (!stacked) {
+                label2.setCompoundDrawables(null, mutate, null, null);
+            }
             label2.setCompoundDrawablePadding(dp(4.0f));
             nav.addView(label2, new LinearLayout.LayoutParams(0, value, 1.0f));
             label2.setOnClickListener((view) -> navigate(NavigationState.route(tabIndex)));
             value4++;
             focusable = true;
             value2 = 13;
+        }
+        I18n.apply(this.root);
+        if (this.page == 0 && (connected() || this.demo || this.recorder != null)) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
     }
 
@@ -724,7 +808,7 @@ public final class MainActivity extends Activity {
         } else {
             StringBuilder builder = new StringBuilder();
             builder.append(json.optString("date", "Horário não informado"));
-            builder.append(json.optBoolean("demo") ? " · SIMULADO" : " · origem conforme registro");
+            builder.append(json.optBoolean("demo") ? " · SIMULADO" : "");
             string = builder.toString();
         }
         DtcReadResult lastRead = null;
@@ -756,6 +840,14 @@ public final class MainActivity extends Activity {
             public void journal() {
                 MainActivity.this.navigate(NavigationState.JOURNAL);
             }
+
+            @Override
+            public void fuel() {
+                MainActivity.this.navigate(NavigationState.JOURNAL);
+                if (MainActivity.this.journal != null) {
+                    MainActivity.this.journal.add(io.rea.obd.journal.JournalEntry.Kind.FUEL);
+                }
+            }
         });
         if (this.caseWarning.isEmpty()) {
             return;
@@ -776,7 +868,7 @@ public final class MainActivity extends Activity {
         File file = this.lastCsv;
         boolean enabled = file != null && file.exists();
         File lastCsv = this.lastCsv;
-        DashboardScreen.Views dashboardViews = DashboardScreen.render(linearLayout, activeVehicle, dashboardState, status, busy, enabled, lastCsv == null ? "" : lastCsv.getName(), new DashboardScreen.Actions() {
+        DashboardScreen.Views dashboardViews = DashboardScreen.render(linearLayout, activeVehicle, dashboardState, expandedPid(), status, busy, enabled, lastCsv == null ? "" : lastCsv.getName(), new DashboardScreen.Actions() {
             @Override
             public void connection() {
                 if (MainActivity.this.busy) {
@@ -799,6 +891,12 @@ public final class MainActivity extends Activity {
                 MainActivity.this.page = 2;
                 MainActivity.this.render();
                 MainActivity.this.schedulePoll(100L);
+            }
+
+            @Override
+            public void expand(int pid) {
+                MainActivity.this.expandedPid = pid;
+                MainActivity.this.render();
             }
 
             @Override
@@ -827,9 +925,25 @@ public final class MainActivity extends Activity {
     private void diagnostics() {
         heading("SCANNER OBD", "Diagnóstico", activeVehicle() == null ? "Selecione um veículo na Garagem." : activeVehicle().name);
         UiKit uiKit = new UiKit(this);
-        LinearLayout feature = uiKit.feature(this.body);
-        uiKit.eyebrow(feature, this.demo ? "EXPERIÊNCIA DE DEMONSTRAÇÃO" : connected() ? "CONEXÃO ATIVA" : "COMECE POR UMA CONEXÃO");
-        uiKit.label(feature, (connected() || this.demo) ? "Scanner pronto" : "Conecte seu scanner", 23, this.TEXT, true);
+        DtcReadResult dtcReadResult = this.currentDtcRead;
+        if (dtcReadResult != null && !this.busy) {
+            readingResult(dtcReadResult);
+            LinearLayout connection = uiKit.disclosure(this.body, "Conexão e nova leitura");
+            label(connection, (connected() || this.demo) ? "Scanner pronto" : "Conecte seu scanner", 17, this.TEXT, true);
+            connectionControls(uiKit, connection);
+        } else {
+            LinearLayout feature = uiKit.feature(this.body);
+            uiKit.eyebrow(feature, this.demo ? "EXPERIÊNCIA DE DEMONSTRAÇÃO" : connected() ? "CONEXÃO ATIVA" : "COMECE POR UMA CONEXÃO");
+            uiKit.label(feature, (connected() || this.demo) ? "Scanner pronto" : "Conecte seu scanner", 23, this.TEXT, true);
+            connectionControls(uiKit, feature);
+            if (dtcReadResult != null) {
+                readingResult(dtcReadResult);
+            }
+        }
+        diagnosticsDetails(uiKit);
+    }
+
+    private void connectionControls(UiKit uiKit, LinearLayout feature) {
         uiKit.label(feature, this.status, 14, this.MUTED, false);
         if (!this.demo && !connected()) {
             uiKit.label(feature, "O app consulta o adaptador e a ECU. Não é necessário conhecer o protocolo do carro.", 14, this.MUTED, false);
@@ -852,34 +966,88 @@ public final class MainActivity extends Activity {
         if (!this.guidedStatus.isEmpty()) {
             DiagnosisScreen.progress(feature, this.guidedCompleted, this.guidedStatus);
         }
-        DtcReadResult dtcReadResult = this.currentDtcRead;
-        if (dtcReadResult != null) {
-            LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
-            if (this.currentDtcVehicle != null) {
-                button(verdict, "Investigar esta leitura", true, () -> {
-                    try {
-                        editCase(capturedCase(), true);
-                    } catch (Exception e) {
-                        message(error(e));
-                    }
-                }).setEnabled((this.caseBusy || this.busy) ? false : true);
-            }
-            for (final DtcObservation dtcObservation : dtcReadResult.observations()) {
-                LinearLayout card = card(this.body);
-                label(card, dtcObservation.code, 26, this.AMBER, true);
-                StringBuilder builder = new StringBuilder();
-                builder.append(DtcFormatter.category(dtcObservation.category));
-                builder.append(this.currentDtcRead.origin == DataOrigin.SIMULATED ? " · exemplo simulado" : "");
-                label(card, builder.toString(), 13, this.MUTED, false);
-                String structure = DtcStructure.describe(dtcObservation.code);
-                if (structure != null) {
-                    label(card, structure, 13, this.ACCENT, true);
-                }
-                DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
-                label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
-                button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
-            }
+    }
+
+    private void readingResult(DtcReadResult dtcReadResult) {
+        LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
+        boolean hasCodes = !dtcReadResult.observations().isEmpty();
+        if (this.currentDtcVehicle != null && dtcReadResult == this.currentDtcRead) {
+            button(verdict, "Conversar com a IA", true, this::talkAboutCurrentReading)
+                    .setEnabled(!this.busy && !this.caseBusy);
         }
+        if (hasCodes) {
+            button(verdict, "Entender esta leitura", false, () -> understandReading(dtcReadResult)).setTag("action-understand");
+            button(verdict, "Preparar resumo para oficina", false, () -> workshopSummary(dtcReadResult)).setTag("action-workshop");
+        }
+        if (this.currentDtcVehicle != null) {
+            LinearLayout investigation = new UiKit(this).disclosure(verdict, I18n.english() ? "Add symptoms and investigate" : "Adicionar sintomas e investigar");
+            button(investigation, "Investigar esta leitura", false, () -> {
+                try {
+                    editCase(capturedCase(), true);
+                } catch (Exception e) {
+                    message(error(e));
+                }
+            }).setEnabled((this.caseBusy || this.busy) ? false : true);
+        }
+        for (final DtcObservation dtcObservation : dtcReadResult.observations()) {
+            LinearLayout card = card(this.body);
+            label(card, dtcObservation.code, 26, this.AMBER, true);
+            StringBuilder builder = new StringBuilder();
+            builder.append(DtcFormatter.category(dtcObservation.category));
+            builder.append(dtcReadResult.origin == DataOrigin.SIMULATED ? " · exemplo simulado" : "");
+            label(card, builder.toString(), 13, this.MUTED, false);
+            String structure = DtcStructure.describe(dtcObservation.code);
+            if (structure != null) {
+                label(card, structure, 13, this.ACCENT, true);
+            }
+            DtcDefinition dtcDefinition = DtcReference.find(dtcObservation.code);
+            label(card, dtcDefinition == null ? "Sem descrição detalhada no catálogo local." : dtcDefinition.meaning, 14, dtcDefinition == null ? this.MUTED : this.TEXT, false);
+            io.rea.obd.knowledge.DtcGuidance guidance = io.rea.obd.knowledge.DtcGuidance.of(dtcObservation.code);
+            label(card, guidance.headline(), 14, guidance.urgent() ? this.AMBER : this.ACCENT, true).setTag("guidance-" + dtcObservation.code);
+            button(card, "Consultar " + dtcObservation.code, false, () -> showDtcDefinition(dtcObservation.code));
+        }
+    }
+
+    void understandReading(DtcReadResult dtcReadResult) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18.0f), dp(10.0f), dp(18.0f), dp(16.0f));
+        DiagnosisScreen.explanation(content, dtcReadResult, this::showDtcDefinition);
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setBackgroundColor(this.CARD);
+        scrollView.addView(content);
+        new LocalizedDialog(this).setTitle("Entender esta leitura").setView(scrollView).setNeutralButton("Resumo para oficina", (dialog, which) -> workshopSummary(dtcReadResult)).setPositiveButton("Fechar", null).show();
+    }
+
+    void workshopSummary(DtcReadResult dtcReadResult) {
+        String vehicle = this.currentDtcVehicle == null ? "" : this.currentDtcVehicle.name + " · " + this.currentDtcVehicle.description();
+        String adapter = this.currentDtcAdapter;
+        final List<String> lines = ReportText.readable(ReadingGuide.workshopSummary(dtcReadResult, vehicle, adapter, dtcReadResult == this.currentDtcRead ? this.currentSupplement : null), WallClock.zone());
+        final String text = String.join("\n", lines);
+        new LocalizedDialog(this).setTitle("Resumo para oficina").setMessage(text).setPositiveButton("Compartilhar", (dialog, which) -> shareWorkshopSummary(text)).setNeutralButton("Salvar PDF", (dialog, which) -> saveWorkshopPdf(lines)).setNegativeButton("Fechar", null).show();
+    }
+
+    private void shareWorkshopSummary(String text) {
+        Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, I18n.t("Resumo para oficina · BorbaCar Labs")).putExtra(Intent.EXTRA_TEXT, text);
+        startActivity(Intent.createChooser(send, I18n.t("Compartilhar resumo")));
+    }
+
+    private void saveWorkshopPdf(List<String> lines) {
+        try {
+            File file = new File(getCacheDir(), "resumo-oficina.pdf");
+            ReportWriter.pdf(file, lines);
+            this.pendingPdf = file;
+            Intent intent = new Intent("android.intent.action.CREATE_DOCUMENT");
+            intent.addCategory("android.intent.category.OPENABLE");
+            intent.setType("application/pdf");
+            intent.putExtra("android.intent.extra.TITLE", "resumo-oficina.pdf");
+            startActivityForResult(intent, 500);
+        } catch (Exception e) {
+            message(error(e));
+        }
+    }
+
+    private void diagnosticsDetails(UiKit uiKit) {
         if (this.currentSupplement != null) {
             LinearLayout card = card(this.body);
             label(card, this.currentSupplement.incomplete() ? "COMPLEMENTO INCOMPLETO" : "COMPLEMENTO COLETADO", 11, this.AMBER, true);
@@ -1009,7 +1177,7 @@ public final class MainActivity extends Activity {
             row.setCompoundDrawablesRelative(null, null, null, null);
             row.setCompoundDrawablePadding(0);
             row.setTextSize(13.0f);
-            row.setPadding(dp(6.0f), dp(14.0f), dp(6.0f), dp(14.0f));
+            row.setPadding(dp(6.0f), dp(column.getOrientation() == LinearLayout.VERTICAL ? 6.0f : 14.0f), dp(6.0f), dp(column.getOrientation() == LinearLayout.VERTICAL ? 6.0f : 14.0f));
             row.setSelected(value == i);
             row.setTextColor(value == i ? this.ACCENT : this.MUTED);
             if (value == i) {
@@ -1050,11 +1218,11 @@ public final class MainActivity extends Activity {
             parts[i] = builder.toString();
             i = value;
         }
-        new AlertDialog.Builder(this).setTitle("Comparar · primeira leitura").setItems(parts, (dialog, which) -> this.chooseSecondReading(parts, comparableHistory, dialog, which)).setNegativeButton("Cancelar", null).show();
+        new LocalizedDialog(this).setTitle("Comparar · primeira leitura").setItems(parts, (dialog, which) -> this.chooseSecondReading(parts, comparableHistory, dialog, which)).setNegativeButton("Cancelar", null).show();
     }
 
     void chooseSecondReading(String[] parts, final List list, DialogInterface dialogInterface, final int i) {
-        new AlertDialog.Builder(this).setTitle("Comparar · segunda leitura").setItems(parts, (dialog, which) -> {
+        new LocalizedDialog(this).setTitle("Comparar · segunda leitura").setItems(parts, (dialog, which) -> {
             try {
                 message(String.join("\n\n", CaptureComparison.lines(DtcReadJson.decode(((JSONObject) list.get(i)).getJSONObject("dtc_read")), DtcReadJson.decode(((JSONObject) list.get(which)).getJSONObject("dtc_read")))));
             } catch (Exception e) {
@@ -1070,7 +1238,7 @@ public final class MainActivity extends Activity {
             label(this.body, "Não foi possível carregar a garagem. Reinicie após verificar o armazenamento.", 14, this.AMBER, false);
         } else {
             VehicleRecord activeRecord = vehicleRepository.activeRecord();
-            GarageScreen.render(this.body, this.vehicles.records(), activeRecord == null ? "" : activeRecord.id, profileLocked(), this.vehicleCatalog, new GarageActions());
+            GarageScreen.render(this.body, this.vehicles.records(), activeRecord == null ? "" : activeRecord.id, profileLocked(), catalog(true), new GarageActions());
         }
     }
 
@@ -1100,7 +1268,7 @@ public final class MainActivity extends Activity {
                 MainActivity.this.currentSupplement = null;
                 MainActivity.this.currentCaseSamples = Collections.emptyList();
                 MainActivity.this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
-                MainActivity.this.clearRpmHistory();
+                MainActivity.this.clearHistories();
                 MainActivity.this.refreshHistory();
                 MainActivity.this.render();
             } catch (Exception e) {
@@ -1114,7 +1282,7 @@ public final class MainActivity extends Activity {
             if (MainActivity.this.profileLocked()) {
                 return;
             }
-            new AlertDialog.Builder(MainActivity.this).setTitle("Remover perfil?").setMessage("Os relatórios e investigações serão preservados na seção de perfis removidos.").setNegativeButton("Cancelar", null).setPositiveButton("Remover", (dialog, which) -> {
+            new LocalizedDialog(MainActivity.this).setTitle("Remover perfil?").setMessage("Os relatórios e investigações serão preservados na seção de perfis removidos.").setNegativeButton("Cancelar", null).setPositiveButton("Remover", (dialog, which) -> {
                 if (MainActivity.this.profileLocked()) {
                     return;
                 }
@@ -1143,16 +1311,64 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private static String languageName(String choice) {
+        if (I18n.PORTUGUESE.equals(choice)) {
+            return "Português";
+        }
+        return I18n.ENGLISH.equals(choice) ? "English" : "Automático";
+    }
+
+    private void chooseLanguage() {
+        final String[] choices = {I18n.AUTO, I18n.PORTUGUESE, I18n.ENGLISH};
+        String[] names = {"Automático (idioma do sistema)", "Português", "English"};
+        int current = java.util.Arrays.asList(choices).indexOf(I18n.preference(this));
+        new LocalizedDialog(this).setTitle("Idioma").setSingleChoiceItems(names, current, (dialog, which) -> {
+            dialog.dismiss();
+            if (!I18n.save(this, choices[which])) {
+                message("Não foi possível salvar a preferência.");
+                return;
+            }
+            I18n.init(this);
+            render();
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
     private void more() {
         String text;
         heading("BORBACAR LABS", "Ajustes", "");
-        button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
-        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
+        UiKit kit = new UiKit(this);
+        kit.section(this.body, "Demonstração", "Conheça o app com dados fictícios, sem adaptador.");
+        button(this.body, this.demo ? "Sair da demonstração" : "Ativar demonstração", false, () -> {
+            if (this.demo) {
+                disconnect();
+            } else {
+                startDemo();
+            }
+            this.page = 0;
+            render();
+        });
+        kit.section(this.body, "Uso do dia a dia", "");
         button(this.body, ReminderReceiver.enabled(this) ? "Lembretes de manutenção: ligados" : "Lembretes de manutenção: desligados", false, () -> toggleReminders());
-        button(this.body, "Aparência", false, () -> this.chooseAppearance());
+        if (ThemePalette.LIGHT.equals(ThemePalette.preference(this))) {
+            text = "Claro";
+        } else {
+            text = ThemePalette.DARK.equals(ThemePalette.preference(this)) ? "Escuro" : "Sistema";
+        }
+        button(this.body, "Tema: " + text, false, () -> this.chooseAppearance());
+        button(this.body, "Idioma: " + languageName(I18n.preference(this)), false, () -> this.chooseLanguage());
+        kit.section(this.body, "Avançado", "");
+        button(this.body, I18n.english() ? "Backup and restore" : "Backup e restauração", false, () -> {
+            if (connected() || this.demo || this.busy || this.caseBusy || this.caseExportPreparing || (this.journal != null && !this.journal.canBackup())) {
+                message(I18n.english() ? "End the connection or demo and wait for pending saves before backing up." : "Encerre a conexão ou demonstração e aguarde os salvamentos antes do backup.");
+                return;
+            }
+            startActivity(new Intent(this, io.rea.obd.backup.BackupActivity.class));
+        });
+        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
+        button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
-                        + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas. "
+                        + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas vão direto ao provedor que você escolheu (Gemini ou Claude), com a sua chave de API. "
                         + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados. "
                         + "Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços digitados ali não são detectados.\n\n"
                         + "Relatórios só saem quando você escolhe onde salvar ou compartilhar. Para apagar tudo: Configurações do Android › Apps › BorbaCar Labs › Limpar dados."));
@@ -1163,31 +1379,12 @@ public final class MainActivity extends Activity {
                 message("Não foi possível salvar a preferência.");
             }
         });
-        LinearLayout linearLayout = this.body;
-        StringBuilder builder = new StringBuilder("Tema: ");
-        if (ThemePalette.LIGHT.equals(ThemePalette.preference(this))) {
-            text = "Claro";
-        } else {
-            text = ThemePalette.DARK.equals(ThemePalette.preference(this)) ? "Escuro" : "Sistema";
-        }
-        builder.append(text);
-        builder.append(" · altere com a aquisição encerrada.");
-        label(linearLayout, builder.toString(), 13, this.MUTED, false);
         LinearLayout disclosure = new UiKit(this).disclosure(this.body, "Sobre e referências");
         label(disclosure, "SOBRE ESTA VERSÃO", 12, this.ACCENT, true);
         gap(disclosure, 8);
         label(disclosure, "BorbaCar Labs · " + appVersion() + "\nAndroid 8 ou superior\nArmazenamento local · sem conta e sem envio de dados", 14, this.TEXT, false);
         gap(disclosure, 10);
         label(disclosure, "A conexão e as leituras reais precisam ser validadas em um adaptador e veículo. Use o modo de demonstração para conhecer a interface.", 13, this.MUTED, false);
-        button(this.body, this.demo ? "Sair da demonstração" : "Ativar demonstração", false, () -> {
-            if (this.demo) {
-                disconnect();
-            } else {
-                startDemo();
-            }
-            this.page = 0;
-            render();
-        });
         button(disclosure, "Fontes de protocolo", false, () -> {
             ArrayList items = new ArrayList();
             Iterator<SourceReference> it = KnowledgeRepository.all().iterator();
@@ -1227,16 +1424,19 @@ public final class MainActivity extends Activity {
     }
 
     public void chooseAppearance() {
-        if (profileLocked()) {
-            message("Encerre a conexão, demonstração e gravação antes de mudar o tema. Isso preserva sua sessão atual.");
+        if (connected() || this.busy || this.recorder != null) {
+            message("Encerre a conexão e a gravação antes de mudar o tema. Isso preserva sua sessão atual.");
             return;
         }
         final String[] parts = {ThemePalette.SYSTEM, ThemePalette.LIGHT, ThemePalette.DARK};
         final String preference = ThemePalette.preference(this);
         final int[] values = {Arrays.asList(parts).indexOf(preference)};
-        new AlertDialog.Builder(this).setTitle("Aparência").setSingleChoiceItems(new String[]{"Usar tema do sistema", "Claro", "Escuro"}, values[0], (dialog, which) -> values[0] = which).setNegativeButton("Cancelar", null).setPositiveButton("Aplicar", (dialog, which) -> {
-            if (profileLocked() || preference.equals(parts[values[0]])) {
+        new LocalizedDialog(this).setTitle("Aparência").setSingleChoiceItems(new String[]{"Usar tema do sistema", "Claro", "Escuro"}, values[0], (dialog, which) -> values[0] = which).setNegativeButton("Cancelar", null).setPositiveButton("Aplicar", (dialog, which) -> {
+            if (connected() || this.busy || this.recorder != null || preference.equals(parts[values[0]])) {
                 return;
+            }
+            if (this.demo) {
+                disconnect();
             }
             if (ThemePalette.save(this, parts[values[0]])) {
                 recreate();
@@ -1280,7 +1480,7 @@ public final class MainActivity extends Activity {
         LinearLayout linearLayout = new LinearLayout(this);
         linearLayout.setOrientation(LinearLayout.VERTICAL);
         linearLayout.setPadding(dp(18.0f), dp(10.0f), dp(18.0f), dp(16.0f));
-        label(linearLayout, "Catálogo " + DtcReference.VERSION + " · significados genéricos de " + DtcReference.all().size() + " códigos P0, conferidos em documentos públicos de fabricantes. Não determina causas, peças ou compatibilidade específica.", 14, this.TEXT, false);
+        label(linearLayout, "Catálogo " + DtcReference.VERSION + " · significados genéricos de " + DtcReference.all().size() + " códigos P0 e U0, conferidos em documentos públicos de fabricantes. Não determina causas, peças ou compatibilidade específica.", 14, this.TEXT, false);
         final EditText editText = new EditText(this);
         editText.setTextColor(this.TEXT);
         editText.setHintTextColor(this.MUTED);
@@ -1312,7 +1512,7 @@ public final class MainActivity extends Activity {
         ScrollView scrollView = new ScrollView(this);
         scrollView.setBackgroundColor(this.CARD);
         scrollView.addView(linearLayout);
-        new AlertDialog.Builder(this).setTitle("Catálogo OBD offline").setView(scrollView).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(this).setTitle("Catálogo OBD offline").setView(scrollView).setPositiveButton("Fechar", null).show();
     }
 
     public void editVehicle(VehicleProfile vehicleProfile) {
@@ -1324,7 +1524,7 @@ public final class MainActivity extends Activity {
             return;
         }
         try {
-            VehicleCatalogStore.Loaded loaded = this.vehicleCatalog;
+            VehicleCatalogStore.Loaded loaded = catalog(true);
             VehicleEditor vehicleEditor = new VehicleEditor(this, vehicleRecord, loaded == null ? null : loaded.catalog, new VehicleEditor.Save() {
                 @Override
                 public final void save(VehicleRecord vehicleRecord2, int i, VehicleCatalog vehicleCatalog) throws Exception {
@@ -1353,8 +1553,13 @@ public final class MainActivity extends Activity {
     }
 
     public void chooseTransport() {
-        if (activeVehicle() != null) {
-            ConnectionScreen.show(this, new ConnectionScreen.Actions() {
+        {
+            ConnectionScreen.show(this, lastAdapterName(), new ConnectionScreen.Actions() {
+                @Override
+                public void last() {
+                    MainActivity.this.reconnectLast();
+                }
+
                 @Override
                 public void nearby() {
                     MainActivity.this.scanBle();
@@ -1370,11 +1575,53 @@ public final class MainActivity extends Activity {
                     MainActivity.this.wifiDialog();
                 }
             });
+        }
+    }
+
+    String lastAdapterName() {
+        SharedPreferences preferences = getPreferences(0);
+        return preferences.getString("last_adapter_kind", "").isEmpty() ? null : preferences.getString("last_adapter_name", "adaptador");
+    }
+
+    public void reconnectLast() {
+        SharedPreferences preferences = getPreferences(0);
+        String kind = preferences.getString("last_adapter_kind", "");
+        String address = preferences.getString("last_adapter_address", "");
+        String name = preferences.getString("last_adapter_name", address);
+        if (kind.equals("wifi")) {
+            try {
+                int colon = address.lastIndexOf(':');
+                Transports.Wifi wifi = new Transports.Wifi(address.substring(0, colon), Integer.parseInt(address.substring(colon + 1)));
+                this.pendingAdapter = new String[]{kind, address, name};
+                connect(wifi, name);
+            } catch (Exception e) {
+                message("Informe IP e porta válidos.");
+            }
             return;
         }
-        this.page = 2;
-        render();
-        message("Selecione um veículo antes de conectar.");
+        if (this.adapter == null) {
+            message("Este aparelho não possui Bluetooth compatível.");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 31 && (checkSelfPermission("android.permission.BLUETOOTH_CONNECT") != PackageManager.PERMISSION_GRANTED || checkSelfPermission("android.permission.BLUETOOTH_SCAN") != PackageManager.PERMISSION_GRANTED)) {
+            requestPermissions(new String[]{"android.permission.BLUETOOTH_CONNECT", "android.permission.BLUETOOTH_SCAN"}, 102);
+            return;
+        }
+        try {
+            if (!this.adapter.isEnabled()) {
+                message("Ative o Bluetooth nas configurações.");
+                return;
+            }
+            BluetoothDevice device = this.adapter.getRemoteDevice(address);
+            this.pendingAdapter = new String[]{kind, address, name};
+            connect(kind.equals("ble") ? new Transports.Ble(this, device) : new Transports.Classic(device, this.adapter), name);
+        } catch (IllegalArgumentException | SecurityException e) {
+            message("Não foi possível reconectar. Escolha o adaptador de novo.");
+        }
+    }
+
+    static boolean looksLikeObd(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).matches(".*(obd|elm|vgate|v-link|vlink|veepeak|konnwei|icar|scan|carista|kiwi|obdlink|ancel|autel|launch).*");
     }
 
     public void chooseDevice() {
@@ -1388,27 +1635,32 @@ public final class MainActivity extends Activity {
         }
         try {
             if (!this.adapter.isEnabled()) {
-                new AlertDialog.Builder(this).setTitle("Ative o Bluetooth").setMessage("Ative o Bluetooth e pareie seu adaptador nas configurações do Android.").setPositiveButton("Abrir configurações", (dialog, which) -> startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"))).setNegativeButton("Cancelar", null).show();
+                new LocalizedDialog(this).setTitle("Ative o Bluetooth").setMessage("Ative o Bluetooth e pareie seu adaptador nas configurações do Android.").setPositiveButton("Abrir configurações", (dialog, which) -> startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"))).setNegativeButton("Cancelar", null).show();
                 return;
             }
-            final ArrayList items = new ArrayList(this.adapter.getBondedDevices());
-            items.sort(Comparator.comparing((obj) -> ((BluetoothDevice) obj).getAddress()));
+            final ArrayList<BluetoothDevice> items = new ArrayList<>(this.adapter.getBondedDevices());
+            final Map<BluetoothDevice, String> names = new HashMap<>();
+            for (BluetoothDevice device : items) {
+                names.put(device, device.getName() == null ? "Dispositivo Bluetooth" : device.getName());
+            }
+            items.sort(Comparator.comparing((BluetoothDevice device) -> !looksLikeObd(names.get(device))).thenComparing(device -> names.get(device).toLowerCase(Locale.ROOT)));
             int size = items.size();
             final String[] parts = new String[size + 1];
             for (int i = 0; i < items.size(); i++) {
-                BluetoothDevice bluetoothDevice = (BluetoothDevice) items.get(i);
+                BluetoothDevice bluetoothDevice = items.get(i);
                 StringBuilder builder = new StringBuilder();
-                builder.append(bluetoothDevice.getName() == null ? "Dispositivo Bluetooth" : bluetoothDevice.getName());
+                builder.append(names.get(bluetoothDevice));
                 builder.append("\n");
                 builder.append(bluetoothDevice.getAddress());
                 parts[i] = builder.toString();
             }
             parts[size] = "Parear outro adaptador…";
-            new AlertDialog.Builder(this).setTitle("Escolha seu adaptador ELM327").setItems(parts, (dialog, which) -> {
+            new LocalizedDialog(this).setTitle("Escolha seu adaptador ELM327").setItems(parts, (dialog, which) -> {
                 if (which == items.size()) {
                     startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"));
                 } else {
-                    connect(new Transports.Classic((BluetoothDevice) items.get(which), this.adapter), parts[which].split("\\n")[0]);
+                    this.pendingAdapter = new String[]{"classic", items.get(which).getAddress(), parts[which].split("\\n")[0]};
+                    connect(new Transports.Classic(items.get(which), this.adapter), parts[which].split("\\n")[0]);
                 }
             }).setNegativeButton("Cancelar", null).show();
         } catch (SecurityException ignored) {
@@ -1442,6 +1694,9 @@ public final class MainActivity extends Activity {
         if (i == 101) {
             scanBle();
         }
+        if (i == 102) {
+            reconnectLast();
+        }
     }
 
     public void wifiDialog() {
@@ -1451,14 +1706,14 @@ public final class MainActivity extends Activity {
         final EditText editText = new EditText(this);
         editText.setSingleLine(true);
         editText.setHint("IP do adaptador (ex.: 192.168.0.10)");
-        editText.setText(getPreferences(0).getString("wifi_host", ""));
+        editText.setText(getPreferences(0).getString("wifi_host", "192.168.0.10"));
         linearLayout.addView(editText);
         final EditText editText2 = new EditText(this);
         editText2.setInputType(InputType.TYPE_CLASS_NUMBER);
-        editText2.setHint("Porta documentada pelo fabricante");
-        editText2.setText(getPreferences(0).getString("wifi_port", ""));
+        editText2.setHint("Porta (a mais comum é 35000)");
+        editText2.setText(getPreferences(0).getString("wifi_port", "35000"));
         linearLayout.addView(editText2);
-        new AlertDialog.Builder(this).setTitle("Adaptador Wi-Fi TCP").setView(linearLayout).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", (dialog, which) -> {
+        new LocalizedDialog(this).setTitle("Adaptador Wi-Fi TCP").setView(linearLayout).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", (dialog, which) -> {
             try {
                 String wifiHost = editText.getText().toString().trim();
                 int value = Integer.parseInt(editText2.getText().toString());
@@ -1466,6 +1721,7 @@ public final class MainActivity extends Activity {
                     throw new IllegalArgumentException();
                 }
                 getPreferences(0).edit().putString("wifi_host", wifiHost).putString("wifi_port", Integer.toString(value)).apply();
+                this.pendingAdapter = new String[]{"wifi", wifiHost + ":" + value, wifiHost + ":" + value};
                 connect(new Transports.Wifi(wifiHost, value), wifiHost + ":" + value);
             } catch (Exception ignored) {
                 message("Informe IP e porta válidos.");
@@ -1498,11 +1754,15 @@ public final class MainActivity extends Activity {
             return;
         }
         final LinkedHashMap map = new LinkedHashMap();
+        final List<BluetoothDevice> found = new ArrayList<>();
+        final int[] obdCount = {0};
         final ArrayAdapter arrayAdapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1);
-        final AlertDialog alertDialog = new AlertDialog.Builder(this).setTitle("Procurando adaptadores BLE…").setAdapter(arrayAdapter, (dialog, which) -> {
-            BluetoothDevice bluetoothDevice = (BluetoothDevice) new ArrayList(map.values()).get(which);
+        final AlertDialog alertDialog = new LocalizedDialog(this).setTitle("Procurando adaptadores BLE…").setAdapter(arrayAdapter, (dialog, which) -> {
+            BluetoothDevice bluetoothDevice = found.get(which);
             stopBleScan();
-            connect(new Transports.Ble(this, bluetoothDevice), (String) arrayAdapter.getItem(which));
+            String label = ((String) arrayAdapter.getItem(which)).split(" · ")[0];
+            this.pendingAdapter = new String[]{"ble", bluetoothDevice.getAddress(), label};
+            connect(new Transports.Ble(this, bluetoothDevice), label);
         }).setNegativeButton("Cancelar", (dialog, which) -> stopBleScan()).create();
         final ScanCallback scanCallback = new ScanCallback() {
             @Override
@@ -1520,15 +1780,12 @@ public final class MainActivity extends Activity {
                 }
                 map.put(device.getAddress(), device);
                 String name = device.getName();
-                ArrayAdapter arrayAdapter2 = arrayAdapter;
-                StringBuilder builder = new StringBuilder();
-                if (name == null) {
-                    name = "Dispositivo BLE";
+                if (name == null || name.trim().isEmpty()) {
+                    return;
                 }
-                builder.append(name);
-                builder.append(" · ");
-                builder.append(device.getAddress());
-                arrayAdapter2.add(builder.toString());
+                int position = looksLikeObd(name) ? obdCount[0]++ : found.size();
+                found.add(position, device);
+                arrayAdapter.insert(name + " · " + device.getAddress(), position);
             }
         };
         this.bleCallback = scanCallback;
@@ -1568,7 +1825,7 @@ public final class MainActivity extends Activity {
     }
 
     private void connect(ElmTransport elmTransport, String deviceName) {
-        disconnect();
+        disconnect(false);
         this.acquisitionSessionId = UUID.randomUUID().toString();
         final int i = this.session;
         final ElmSession elmSession = new ElmSession(elmTransport);
@@ -1582,6 +1839,7 @@ public final class MainActivity extends Activity {
             ScheduledExecutorService scheduledExecutorService = this.watchdog;
             Objects.requireNonNull(elmSession);
             ScheduledFuture<?> schedule = scheduledExecutorService.schedule(() -> elmSession.close(), 35L, TimeUnit.SECONDS);
+            String[] candidate = this.pendingAdapter;
             try {
                 elmSession.connect();
                 schedule.cancel(false);
@@ -1593,6 +1851,10 @@ public final class MainActivity extends Activity {
                         connectionLost(elmSession);
                         return;
                     }
+                    if (candidate != null) {
+                        getPreferences(0).edit().putString("last_adapter_kind", candidate[0]).putString("last_adapter_address", candidate[1]).putString("last_adapter_name", candidate[2]).apply();
+                    }
+                    this.pollFailures = 0;
                     this.busy = false;
                     this.status = this.deviceName + " · ECU respondeu · " + elmSession.protocol();
                     render();
@@ -1616,6 +1878,11 @@ public final class MainActivity extends Activity {
     }
 
     public void disconnect() {
+        disconnect(true);
+    }
+
+    private void disconnect(boolean keepReading) {
+        boolean keep = keepReading && !this.demo && this.currentDtcRead != null;
         this.session++;
         this.guidedStatus = "";
         this.guidedCompleted = 0;
@@ -1631,21 +1898,23 @@ public final class MainActivity extends Activity {
         this.ui.removeCallbacks(this.pollTask);
         this.samples.clear();
         this.contextualSamples.clear();
-        clearRpmHistory();
+        clearHistories();
         this.voltage = "—";
         this.voltageOrigin = null;
-        this.currentDtcRead = null;
-        this.currentDtcVehicle = null;
-        this.currentDtcRecord = null;
-        this.currentSupplement = null;
-        this.currentCaseSamples = Collections.emptyList();
-        this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
+        if (!keep) {
+            this.currentDtcRead = null;
+            this.currentDtcVehicle = null;
+            this.currentDtcRecord = null;
+            this.currentSupplement = null;
+            this.currentCaseSamples = Collections.emptyList();
+            this.scanSummary = "Inicie uma leitura para consultar os códigos OBD2.";
+        }
         this.status = "Nenhum adaptador conectado";
         render();
     }
 
     public void startDemo() {
-        disconnect();
+        disconnect(false);
         this.acquisitionSessionId = UUID.randomUUID().toString();
         this.demo = true;
         this.status = "Simulador local · dados fictícios";
@@ -1656,7 +1925,7 @@ public final class MainActivity extends Activity {
 
     public void schedulePoll(long value) {
         this.ui.removeCallbacks(this.pollTask);
-        if (this.resumed && !this.destroyed && this.page == 0) {
+        if (this.resumed && !this.destroyed && (this.page == 0 || this.recorder != null)) {
             if (this.demo || connected()) {
                 this.ui.postDelayed(this.pollTask, value);
             }
@@ -1664,7 +1933,7 @@ public final class MainActivity extends Activity {
     }
 
     public void poll() {
-        if (!this.resumed || this.page != 0 || this.busy || this.polling) {
+        if (!this.resumed || (this.page != 0 && this.recorder == null) || this.busy || this.polling) {
             return;
         }
         if (this.demo || connected()) {
@@ -1678,6 +1947,12 @@ public final class MainActivity extends Activity {
                 map.put(5, Double.valueOf((Math.sin(((double) this.demoTick) * 0.05d) * 3.0d) + 88.0d));
                 map.put(4, Double.valueOf((10.0d * sin) + 32.0d));
                 map.put(17, Double.valueOf((sin * 6.0d) + 18.0d));
+                map.put(15, Double.valueOf((Math.sin(((double) this.demoTick) * 0.05d) * 2.0d) + 34.0d));
+                map.put(11, Double.valueOf((12.0d * sin) + 45.0d));
+                map.put(14, Double.valueOf((4.0d * sin) + 14.0d));
+                map.put(16, Double.valueOf((1.6d * sin) + 4.2d));
+                map.put(47, Double.valueOf(62.0d - (this.demoTick * 0.01d)));
+                map.put(66, Double.valueOf((0.1d * sin) + 14.1d));
                 for (Integer num : this.selectedPids) {
                     int intValue = num.intValue();
                     Double value = (Double) map.get(num);
@@ -1710,10 +1985,16 @@ public final class MainActivity extends Activity {
                         acceptSample(it.next());
                     }
                     if (poll.failure != null) {
+                        this.pollFailures++;
+                        if (elmSession.isConnected() && this.pollFailures < 3) {
+                            schedulePoll(1500L);
+                            return;
+                        }
                         connectionLost(elmSession);
-                        message(error(poll.failure));
+                        lost(error(poll.failure));
                         return;
                     }
+                    this.pollFailures = 0;
                     this.voltageOrigin = DataOrigin.VEHICLE;
                     this.voltage = poll.adapterVoltage == null ? "—" : String.format(Locale.getDefault(), "%.1f V", poll.adapterVoltage);
                     this.voltageTime = poll.voltageElapsedMillis;
@@ -1724,11 +2005,18 @@ public final class MainActivity extends Activity {
         }
     }
 
-    public void clearRpmHistory() {
-        this.rpmHistory.clear();
-        this.rpmHistoryOrigin = null;
-        this.rpmHistorySessionId = "";
-        this.rpmGap = true;
+    public void clearHistories() {
+        this.histories.clear();
+        this.historyGaps.clear();
+        this.historyOrigin = null;
+        this.historySessionId = "";
+    }
+
+    int expandedPid() {
+        if (this.selectedPids.contains(Integer.valueOf(this.expandedPid)) || this.selectedPids.isEmpty()) {
+            return this.expandedPid;
+        }
+        return this.selectedPids.iterator().next().intValue();
     }
 
     private void acceptSample(TelemetrySample telemetrySample) {
@@ -1738,22 +2026,18 @@ public final class MainActivity extends Activity {
         if (activeVehicle != null && this.acquisitionSessionId != null) {
             this.contextualSamples.put(Integer.valueOf(telemetrySample.pid), new DiagnosticCase.Sample(activeVehicle.id, this.acquisitionSessionId, telemetrySample));
         }
-        if (telemetrySample.pid == 12) {
-            if (telemetrySample.statusAt(this.clock.elapsedMillis(), DashboardState.MAX_AGE_MS) != TelemetrySample.Status.VALID) {
-                this.rpmGap = true;
-                return;
-            }
-            this.rpmHistory.add(new ChartView.Point(telemetrySample.epochMillis, telemetrySample.value.doubleValue(), this.rpmGap));
-            this.rpmGap = false;
-            this.rpmHistoryOrigin = telemetrySample.origin;
-            String acquisitionSessionId = this.acquisitionSessionId;
-            if (acquisitionSessionId == null) {
-                acquisitionSessionId = "";
-            }
-            this.rpmHistorySessionId = acquisitionSessionId;
-            if (this.rpmHistory.size() > 90) {
-                this.rpmHistory.remove(0);
-            }
+        Integer pid = Integer.valueOf(telemetrySample.pid);
+        if (telemetrySample.statusAt(this.clock.elapsedMillis(), DashboardState.MAX_AGE_MS) != TelemetrySample.Status.VALID || telemetrySample.value == null) {
+            this.historyGaps.put(pid, Boolean.TRUE);
+            return;
+        }
+        List<ChartView.Point> history = this.histories.computeIfAbsent(pid, (key) -> new ArrayList());
+        history.add(new ChartView.Point(telemetrySample.epochMillis, telemetrySample.value.doubleValue(), this.historyGaps.getOrDefault(pid, Boolean.TRUE).booleanValue()));
+        this.historyGaps.put(pid, Boolean.FALSE);
+        this.historyOrigin = telemetrySample.origin;
+        this.historySessionId = this.acquisitionSessionId == null ? "" : this.acquisitionSessionId;
+        if (history.size() > 90) {
+            history.remove(0);
         }
     }
 
@@ -1764,7 +2048,7 @@ public final class MainActivity extends Activity {
         DashboardState dashboardState = dashboardState();
         TextView textView = this.recordingBanner;
         if (textView != null) {
-            textView.setText(dashboardState.recording);
+            textView.setText(I18n.t(dashboardState.recording));
         }
         if (this.dashboardViews == null) {
             return;
@@ -1798,14 +2082,25 @@ public final class MainActivity extends Activity {
         }
         String text5 = text4;
         DashboardScreen.Views views = this.dashboardViews;
-        List<ChartView.Point> list = this.rpmHistory;
-        DataOrigin rpmHistoryOrigin = this.rpmHistoryOrigin;
-        if (rpmHistoryOrigin == null) {
+        List<ChartView.Point> list = this.histories.getOrDefault(Integer.valueOf(expandedPid()), Collections.emptyList());
+        DataOrigin historyOrigin = this.historyOrigin;
+        if (historyOrigin == null) {
             text3 = "origem não registrada";
         } else {
-            text3 = rpmHistoryOrigin == DataOrigin.SIMULATED ? "DADOS SIMULADOS" : "leituras OBD";
+            text3 = historyOrigin == DataOrigin.SIMULATED ? "DADOS SIMULADOS" : "leituras OBD";
         }
-        views.bind(dashboardState, list, text3, this.rpmHistorySessionId, flag ? this.voltage : "—", string, text5);
+        views.bind(dashboardState, list, text3, this.historySessionId, flag ? this.voltage : "—", string, text5);
+    }
+
+    private void lost(String text) {
+        if (this.destroyed) {
+            return;
+        }
+        AlertDialog.Builder builder = new LocalizedDialog(this).setTitle("Conexão perdida").setMessage(text).setNegativeButton("Fechar", null);
+        if (lastAdapterName() != null) {
+            builder.setPositiveButton("Reconectar", (dialog, which) -> reconnectLast());
+        }
+        builder.show();
     }
 
     private void connectionLost(ElmSession elmSession) {
@@ -1829,8 +2124,11 @@ public final class MainActivity extends Activity {
             return;
         }
         if (this.demo || connected()) {
-            if (activeVehicle() != null) {
-                new AlertDialog.Builder(this).setTitle("Leitura guiada").setMessage(("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n" + DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT + "\n\n").concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
+            if (activeVehicle() != null && getPreferences(0).getBoolean("guided_read_explained", false)) {
+                startGuidedRead();
+            } else if (activeVehicle() != null) {
+                getPreferences(0).edit().putBoolean("guided_read_explained", true).apply();
+                new LocalizedDialog(this).setTitle("Leitura guiada").setMessage(("Serão consultados códigos de emissões, indicador MIL, prontidão e quadro congelado 00. As respostas disponíveis serão salvas no histórico. Não apaga falhas nem altera configurações.\n\n" + DiagnosisScreen.READINESS_HINT + "\n" + DiagnosisScreen.FREEZE_FRAME_HINT + "\n\n").concat(this.demo ? "Demonstração: todos os resultados serão simulados." : "Use com o veículo parado. Consultas indisponíveis continuarão identificadas como tal.")).setNegativeButton("Cancelar", null).setPositiveButton("Começar", (dialog, which) -> startGuidedRead()).show();
             } else {
                 navigate(2);
                 message("Crie um perfil, mesmo parcial, para guardar o contexto desta leitura.");
@@ -2042,7 +2340,7 @@ public final class MainActivity extends Activity {
             parts[i] = sensor2.name + " (" + sensor2.unit + ")";
             booleans[i] = this.selectedPids.contains(Integer.valueOf(sensor2.pid));
         }
-        new AlertDialog.Builder(this).setTitle("Sensores · até 6").setMultiChoiceItems(parts, booleans, new DialogInterface.OnMultiChoiceClickListener() {
+        new LocalizedDialog(this).setTitle("Sensores · até 6").setMultiChoiceItems(parts, booleans, new DialogInterface.OnMultiChoiceClickListener() {
             @Override
             public final void onClick(DialogInterface dialogInterface, int value, boolean flag) {
                 MainActivity.toggleSensor(booleans, dialogInterface, value, flag);
@@ -2067,6 +2365,7 @@ public final class MainActivity extends Activity {
         }
         this.samples.clear();
         this.contextualSamples.clear();
+        clearHistories();
         this.selectedPids.clear();
         StringBuilder builder = new StringBuilder();
         for (int i2 = 0; i2 < booleans.length; i2++) {
@@ -2166,7 +2465,7 @@ public final class MainActivity extends Activity {
             builder.append(entry.getValue());
             builder.append("\n\n");
         }
-        new AlertDialog.Builder(this).setTitle("Mensagens do painel · Cobalt MY19").setMessage(builder.toString().trim()).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(this).setTitle("Mensagens do painel · Cobalt MY19").setMessage(builder.toString().trim()).setPositiveButton("Fechar", null).show();
     }
 
     public void readReadiness() {
@@ -2181,7 +2480,10 @@ public final class MainActivity extends Activity {
         if (this.demo) {
             message("SIMULAÇÃO: VIN fictício, não representa o veículo.");
         } else {
-            runRead("VIN e calibração", (obdReader) -> obdReader.vehicleInfo());
+            VehicleProfile profile = activeVehicle();
+            String make = profile == null ? null : profile.make;
+            Integer year = profile == null ? null : profile.year;
+            runRead("VIN e calibração", (obdReader) -> withVin(obdReader.vehicleInfo(), make, year));
         }
     }
 
@@ -2191,6 +2493,15 @@ public final class MainActivity extends Activity {
         } else {
             runRead("Quadro congelado · quadro 00", (obdReader) -> obdReader.freezeFrame());
         }
+    }
+
+    static String withVin(String info, String make, Integer year) {
+        if (!info.startsWith("VIN: ")) {
+            return info;
+        }
+        int end = info.indexOf('\n');
+        String extra = io.rea.obd.vehicle.VinDecoder.describe(info.substring(5, end < 0 ? info.length() : end), java.time.LocalDate.now().getYear(), make, year);
+        return extra.isEmpty() ? info : info + "\n" + extra;
     }
 
     private void runRead(String title, final ReadAction readAction) {
@@ -2241,7 +2552,7 @@ public final class MainActivity extends Activity {
         if (!connected() || this.busy || this.demo) {
             return;
         }
-        new AlertDialog.Builder(this).setTitle("Apagar falhas e monitores?").setMessage("O comando OBD2 04 apaga códigos e dados de diagnóstico de emissões e reinicia a prontidão. Faça isso somente com o veículo parado e motor desligado, após guardar o relatório.").setNegativeButton("Cancelar", null).setPositiveButton("Apagar", (dialog, which) -> runSessionAction("Apagar falhas", (elmSession) -> EmissionCodeReset.executeAfterUserConfirmation(elmSession))).show();
+        new LocalizedDialog(this).setTitle("Apagar falhas e monitores?").setMessage("O comando OBD2 04 apaga códigos e dados de diagnóstico de emissões e reinicia a prontidão. Faça isso somente com o veículo parado e motor desligado, após guardar o relatório.").setNegativeButton("Cancelar", null).setPositiveButton("Apagar", (dialog, which) -> runSessionAction("Apagar falhas", (elmSession) -> EmissionCodeReset.executeAfterUserConfirmation(elmSession))).show();
     }
 
     public void sharePdf() {
@@ -2272,7 +2583,7 @@ public final class MainActivity extends Activity {
                 }
             }
             File file = new File(getCacheDir(), "relatorio-rea-obd.pdf");
-            ReportWriter.pdf(file, ReportText.readable(items, java.time.ZoneId.systemDefault()));
+            ReportWriter.pdf(file, ReportText.readable(items, WallClock.zone()));
             this.pendingPdf = file;
             Intent intent = new Intent("android.intent.action.CREATE_DOCUMENT");
             intent.addCategory("android.intent.category.OPENABLE");
@@ -2428,7 +2739,7 @@ public final class MainActivity extends Activity {
         }
         try {
             boolean demo = dtcReadResult.origin == DataOrigin.SIMULATED;
-            JSONObject json = new JSONObject().put("date", new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(new Date(dtcReadResult.completedAtEpochMillis))).put("created_at", Instant.ofEpochMilli(dtcReadResult.completedAtEpochMillis).toString()).put("demo", demo).put("vehicle_id", dtcReadResult.vehicleId == null ? JSONObject.NULL : dtcReadResult.vehicleId);
+            JSONObject json = new JSONObject().put("date", Instant.ofEpochMilli(dtcReadResult.completedAtEpochMillis).atZone(WallClock.zone()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).put("created_at", Instant.ofEpochMilli(dtcReadResult.completedAtEpochMillis).toString()).put("demo", demo).put("vehicle_id", dtcReadResult.vehicleId == null ? JSONObject.NULL : dtcReadResult.vehicleId);
             if (vehicleProfile == null) {
                 vehicleNameSnapshot = "não associado";
             } else {
@@ -2560,7 +2871,7 @@ public final class MainActivity extends Activity {
         ScrollView scrollView = new ScrollView(this);
         scrollView.setBackgroundColor(this.CARD);
         scrollView.addView(linearLayout);
-        final AlertDialog alertDialog = new AlertDialog.Builder(this).setTitle(flag ? "Nova investigação" : "Revisar sintomas").setView(scrollView).setNegativeButton("Cancelar", null).setPositiveButton("Salvar caso", null).create();
+        final AlertDialog alertDialog = new LocalizedDialog(this).setTitle(flag ? "Nova investigação" : "Revisar sintomas").setView(scrollView).setNegativeButton("Cancelar", null).setPositiveButton("Salvar caso", null).create();
         alertDialog.setOnShowListener(new DialogInterface.OnShowListener() {
             @Override
             public final void onShow(DialogInterface dialogInterface) {
@@ -2630,12 +2941,12 @@ public final class MainActivity extends Activity {
             button(linearLayout, "Exportar investigação JSON", false, () -> exportCase(document, false));
             button(linearLayout, "Exportar investigação TXT", false, () -> exportCase(document, "txt"));
             button(linearLayout, "Exportar investigação PDF", false, () -> exportCase(document, true));
-            button(linearLayout, "Análise por IA (demonstração)", false, () -> this.analyzeWithAi(diagnosticCase));
+            button(linearLayout, "Conversar com a IA", true, () -> this.analyzeWithAi(diagnosticCase));
             button(linearLayout, "Excluir esta investigação", false, () -> this.confirmCaseDeletion(diagnosticCase, alertDialogs));
             ScrollView scrollView = new ScrollView(this);
             scrollView.setBackgroundColor(this.CARD);
             scrollView.addView(linearLayout);
-            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Investigação · revisão " + diagnosticCase.revision).setView(scrollView).setPositiveButton("Fechar", null).create();
+            AlertDialog dialog = new LocalizedDialog(this).setTitle("Investigação · revisão " + diagnosticCase.revision).setView(scrollView).setPositiveButton("Fechar", null).create();
             alertDialogs[0] = dialog;
             dialog.show();
         } catch (Exception e) {
@@ -2652,97 +2963,49 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void analyzeWithAi(DiagnosticCase diagnosticCase) {
-        final AiSettings settings = AiSettings.load(this);
-        if (!settings.configured()) {
-            message("Análise por IA", "Configure o endereço e o token do servidor de IA em Ajustes › Análise por IA. A chave da Anthropic fica só no servidor, nunca no celular.");
-            return;
-        }
-        final AnalysisRequest request;
+    private io.rea.obd.ai.AiAssistant aiAssistant;
+
+    private void talkAboutCurrentReading() {
+        if (busy || caseBusy || currentDtcRead == null || currentDtcVehicle == null) return;
         try {
-            request = AnalysisRequest.from(diagnosticCase);
-        } catch (JSONException e) {
-            message(error(e));
-            return;
-        }
-        StringBuilder preview = new StringBuilder("Será enviado ao servidor de IA:\n");
-        JSONObject vehicle = request.body.optJSONObject("vehicle");
-        preview.append("• Veículo: ").append(vehicle == null || vehicle.length() == 0 ? "não informado" : String.join(" ", vehicleWords(vehicle))).append("\n");
-        for (String label : request.labels.values()) {
-            preview.append("• ").append(label).append("\n");
-        }
-        JSONObject symptoms = request.body.optJSONObject("symptoms");
-        if (symptoms != null) {
-            String[][] fields = {{"description", "Sintoma"}, {"when", "Quando"}, {"frequency", "Frequência"}, {"conditions", "Condições"}};
-            for (String[] field : fields) {
-                String text = symptoms.optString(field[0], "");
-                if (!text.isEmpty()) {
-                    preview.append("• ").append(field[1]).append(": \"").append(text).append("\"\n");
+            final DiagnosticCase candidate = capturedCase();
+            caseBusy = true;
+            caseWorker.execute(() -> {
+                try {
+                    DiagnosticCase saved = io.rea.obd.ai.AiCaseRepository.findOrSave(caseStore, candidate);
+                    List<JSONObject> documents = caseStore.latestAll();
+                    post(() -> {
+                        caseBusy = false;
+                        caseDocuments = documents;
+                        render();
+                        analyzeWithAi(saved);
+                    });
+                } catch (Exception e) {
+                    post(() -> { caseBusy = false; message(error(e)); });
                 }
-            }
-        }
-        preview.append("\n");
-        if (!request.removed.isEmpty()) {
-            preview.append("Removido do texto antes do envio: ").append(request.removed).append(".\n");
-        }
-        preview.append("Não são enviados: nome do perfil, VIN, notas, adaptador, identificadores ou horários. ")
-                .append("Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços não são detectados, então confira o texto acima. ")
-                .append("A resposta é gerada por IA e não substitui a avaliação de um profissional.");
-        new AlertDialog.Builder(this).setTitle("Enviar para análise por IA?").setMessage(preview.toString())
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Enviar", (dialog, which) -> {
-                    Notice.show(this, "Analisando com IA…");
-                    new Thread(() -> {
-                        try {
-                            AnalysisResult result = AnalysisResult.parse(AnalysisClient.analyze(settings.serverUrl, settings.token, request.body), request.refs());
-                            post(() -> message("Análise por IA · " + result.model, result.display(request.labels)
-                                    + "\n\nGerado por IA a partir dos dados enviados. São possibilidades, não um diagnóstico confirmado."));
-                        } catch (Exception e) {
-                            post(() -> message("Análise por IA", AnalysisClient.userMessage(e)));
-                        }
-                    }, "borbacar-ai").start();
-                }).show();
+            });
+        } catch (Exception e) { caseBusy = false; message(error(e)); }
     }
 
-    private static List<String> vehicleWords(JSONObject vehicle) {
-        List<String> words = new ArrayList<>();
-        for (String key : new String[]{"make", "model", "year", "engine", "fuel", "transmission"}) {
-            String id = vehicle.optString(key, "");
-            if (!id.isEmpty()) {
-                words.add(id);
-            }
+    private void analyzeWithAi(DiagnosticCase diagnosticCase) {
+        try {
+            if (aiAssistant != null) aiAssistant.close();
+            aiAssistant = new io.rea.obd.ai.AiAssistant(this, diagnosticCase);
+            aiAssistant.show();
+        } catch (Exception e) {
+            message(I18n.t("Não foi possível abrir o assistente: ") + error(e));
         }
-        return words;
     }
 
     private void configureAi() {
-        AiSettings current = AiSettings.load(this);
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(18.0f), dp(8.0f), dp(18.0f), dp(8.0f));
-        UiKit uiKit = new UiKit(this);
-        uiKit.label(form, "Para demonstrações. O celular fala só com o seu servidor (pasta server/ do projeto), que guarda a chave da Anthropic.", 13, this.MUTED, false);
-        final EditText url = uiKit.input(form, "Endereço do servidor", current.serverUrl, "ai-server-url");
-        url.setHint("http://192.168.0.10:8787");
-        url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        final EditText token = uiKit.input(form, "Token de acesso (BORBACAR_TOKEN)", current.token, "ai-token");
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        new AlertDialog.Builder(this).setTitle("Análise por IA").setView(form)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Salvar", (dialog, which) -> {
-                    if (AiSettings.save(this, url.getText().toString(), token.getText().toString())) {
-                        Notice.show(this, AiSettings.load(this).configured() ? "Servidor de IA configurado." : "Dados incompletos: use http(s)://… e um token com 16+ caracteres.");
-                        render();
-                    } else {
-                        message("Não foi possível salvar a configuração da IA.");
-                    }
-                }).show();
+        io.rea.obd.ai.AiSetupDialog.show(this);
     }
 
     void confirmCaseDeletion(final DiagnosticCase diagnosticCase, final AlertDialog[] alertDialogs) {
-        new AlertDialog.Builder(this).setTitle("Excluir caso e todas as revisões?").setMessage("Somente esta investigação será removida. O relatório de leitura e os outros casos serão preservados.").setNegativeButton("Cancelar", null).setPositiveButton("Excluir", (dialog, which) -> this.caseWorker.execute(() -> {
+        new LocalizedDialog(this).setTitle("Excluir caso e todas as revisões?").setMessage("Somente esta investigação será removida. O relatório de leitura e os outros casos serão preservados.").setNegativeButton("Cancelar", null).setPositiveButton("Excluir", (dialog, which) -> this.caseWorker.execute(() -> {
             try {
                 this.caseStore.delete(diagnosticCase.id, diagnosticCase.vehicle.id);
+                io.rea.obd.ai.AiConversation.deleteCase(this, diagnosticCase.id);
                 final List<JSONObject> latestAll = this.caseStore.latestAll();
                 post(() -> {
                     alertDialogs[0].dismiss();
@@ -2761,7 +3024,7 @@ public final class MainActivity extends Activity {
             JSONObject input = list.get(i).optJSONObject("input");
             parts[i] = input.optJSONObject("vehicle").optString("name") + " · revisão " + input.optInt("revision") + " · " + Format.when(input.optLong("revised_at_ms"));
         }
-        new AlertDialog.Builder(this).setTitle(title).setItems(parts, (dialog, which) -> showCase((JSONObject) list.get(which))).setNegativeButton("Fechar", null).show();
+        new LocalizedDialog(this).setTitle(title).setItems(parts, (dialog, which) -> showCase((JSONObject) list.get(which))).setNegativeButton("Fechar", null).show();
     }
 
     private void exportCase(JSONObject json, boolean flag) {
@@ -2843,7 +3106,7 @@ public final class MainActivity extends Activity {
                 builder.append("\n\n");
             }
         }
-        new AlertDialog.Builder(this).setTitle("Histórico preservado").setMessage(builder.toString()).setPositiveButton("Fechar", null).setNeutralButton("Exportar JSON", (dialog, which) -> shareReports(this.detachedHistory)).show();
+        new LocalizedDialog(this).setTitle("Histórico preservado").setMessage(builder.toString()).setPositiveButton("Fechar", null).setNeutralButton("Exportar JSON", (dialog, which) -> shareReports(this.detachedHistory)).show();
     }
 
     public void deleteHistory() {
@@ -2851,7 +3114,7 @@ public final class MainActivity extends Activity {
         if (activeVehicle == null || this.historyStore == null) {
             return;
         }
-        new AlertDialog.Builder(this).setTitle("Apagar histórico de " + activeVehicle.name + "?").setMessage("Os relatórios deste perfil serão removidos. Outros veículos não serão afetados.").setNegativeButton("Cancelar", null).setPositiveButton("Apagar", (dialog, which) -> {
+        new LocalizedDialog(this).setTitle("Apagar histórico de " + activeVehicle.name + "?").setMessage("Os relatórios deste perfil serão removidos. Outros veículos não serão afetados.").setNegativeButton("Cancelar", null).setPositiveButton("Apagar", (dialog, which) -> {
             try {
                 this.historyStore.deleteForVehicle(activeVehicle.id);
                 refreshHistory();
@@ -2877,7 +3140,7 @@ public final class MainActivity extends Activity {
     private List<String> readableReport(JSONObject document) throws JSONException {
         List<String> lines = new ArrayList<>(DiagnosticCaseJson.report(document));
         lines.addAll(ReportText.referenceAppendix(DiagnosticCaseJson.decode(document.getJSONObject("input"))));
-        return ReportText.readable(lines, java.time.ZoneId.systemDefault());
+        return ReportText.readable(lines, WallClock.zone());
     }
 
     private static final int REMINDER_PERMISSION = 702;
@@ -2930,6 +3193,6 @@ public final class MainActivity extends Activity {
         if (this.destroyed) {
             return;
         }
-        new AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("Entendi", null).show();
+        new LocalizedDialog(this).setTitle(title).setMessage(message).setPositiveButton("Entendi", null).show();
     }
 }

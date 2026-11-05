@@ -8,8 +8,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
 import io.rea.obd.journal.FuelSummary;
 import io.rea.obd.journal.JournalEntry;
 import io.rea.obd.journal.JournalJson;
@@ -24,7 +30,6 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +45,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class JournalController {
+    public static final String SUMMARY = "journal-summary";
+    public static final String FIRST_ENTRY = "journal-first-entry";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor((runnable) -> {
         Thread thread = new Thread(runnable, "journal-storage");
         thread.setDaemon(true);
@@ -64,8 +71,10 @@ public final class JournalController {
         public final FuelSummary fuel;
         public final JournalEntry reminder;
         public final String lastFuel;
+        public final BigDecimal odometer;
 
-        Glance(int count, FuelSummary fuel, JournalEntry reminder, String lastFuel) {
+        Glance(int count, FuelSummary fuel, JournalEntry reminder, String lastFuel, BigDecimal odometer) {
+            this.odometer = odometer;
             this.count = count;
             this.fuel = fuel;
             this.reminder = reminder;
@@ -77,22 +86,28 @@ public final class JournalController {
         }
     }
 
+    public boolean canBackup() { return ready && !saving && pendingExport == null; }
+
     public Glance glance(VehicleProfile vehicle) {
         if (!this.ready || vehicle == null) {
             return null;
         }
         int count = 0;
         JournalEntry lastFill = null;
+        BigDecimal odometer = null;
         for (JournalEntry entry : this.entries) {
             if (!entry.vehicleId.equals(vehicle.id) || entry.voided) {
                 continue;
             }
             count++;
+            if (entry.odometer != null && (odometer == null || entry.odometer.compareTo(odometer) > 0)) {
+                odometer = entry.odometer;
+            }
             if (entry.kind == JournalEntry.Kind.FUEL && (lastFill == null || entry.occurredAt > lastFill.occurredAt)) {
                 lastFill = entry;
             }
         }
-        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id), lastFill == null ? "" : lastFill.fuel);
+        return new Glance(count, FuelSummary.latest(this.entries, vehicle.id), MaintenanceReminders.next(this.entries, vehicle.id, WallClock.today()), lastFill == null ? "" : lastFill.fuel, odometer);
     }
 
     public interface Host {
@@ -103,6 +118,9 @@ public final class JournalController {
         VehicleProfile vehicle();
 
         Set<String> vehicleIds();
+
+        default void offerReminders() {
+        }
     }
 
     public JournalController(Activity activity, final Host host, Bundle bundle) {
@@ -152,106 +170,248 @@ public final class JournalController {
 
     public void render(LinearLayout linearLayout) {
         UiKit uiKit = new UiKit(this.activity);
-        uiKit.eyebrow(linearLayout, "ACOMPANHAMENTO DO VEÍCULO");
-        uiKit.label(linearLayout, "Diário do carro", 28, UiKit.TEXT, true);
         final VehicleProfile vehicle = this.host.vehicle();
-        uiKit.label(linearLayout, vehicle == null ? "Escolha um perfil na Garagem para registrar acontecimentos." : vehicle.name + " · informações declaradas por você", 15, UiKit.MUTED, false);
+        uiKit.title(linearLayout, "Diário do carro", 22).setPadding(0, 0, 0, uiKit.dp(2));
+        uiKit.label(linearLayout, vehicle == null ? "Escolha um perfil na Garagem para registrar acontecimentos." : vehicle.name, 13, UiKit.MUTED, false);
         if (!this.warning.isEmpty()) {
             uiKit.label(linearLayout, this.warning, 14, UiKit.AMBER, false);
         }
         if (!this.ready) {
             if (this.warning.isEmpty()) {
                 uiKit.label(linearLayout, "Carregando seus registros…", 14, UiKit.MUTED, false);
-                return;
             }
             return;
         }
-        LinearLayout column = uiKit.column();
-        linearLayout.addView(column);
-        uiKit.button(column, "Novo registro", true, () -> new AlertDialog.Builder(this.activity).setTitle("O que você quer registrar?").setItems(new String[]{"Sintoma", "Serviço", "Abastecimento"}, (dialog, which) -> open(JournalEntry.Kind.values()[which], null, null)).setNegativeButton("Cancelar", null).show()).setEnabled((vehicle == null || this.host.demo() || this.saving) ? false : true);
-        if (this.host.demo()) {
-            uiKit.label(column, "Encerre a demonstração para registrar acontecimentos reais informados por você.", 13, UiKit.AMBER, false);
-        }
         if (vehicle != null) {
-            final FuelSummary latest = FuelSummary.latest(this.entries, vehicle.id);
-            LinearLayout card = uiKit.card(linearLayout, false);
-            uiKit.eyebrow(card, "CONSUMO POR ABASTECIMENTOS");
-            uiKit.label(card, latest.kmPerLiter == null ? "Aguardando um intervalo completo" : latest.kmPerLiter.toPlainString().replace('.', ',') + " km/L", 24, UiKit.TEXT, true);
-            uiKit.label(card, latest.explanation, 13, UiKit.MUTED, false);
-            if (latest.kmPerLiter != null) {
-                uiKit.button(card, "Como foi calculado", false, () -> message("Distância: " + latest.distance + " km\nVolume: " + latest.liters + " L\n" + latest.explanation + "\nEntradas e revisões: " + String.join(", ", latest.entryRevisions)));
-            }
-            BigDecimal bigDecimal = BigDecimal.ZERO;
-            int i = 0;
-            for (JournalEntry journalEntry : this.entries) {
-                if (journalEntry.vehicleId.equals(vehicle.id) && !journalEntry.voided && journalEntry.cost != null) {
-                    bigDecimal = bigDecimal.add(journalEntry.cost);
-                    i++;
-                }
-            }
-            uiKit.label(linearLayout, i == 0 ? "Custos ainda não informados." : "Total informado: " + Format.money(bigDecimal) + " · " + Format.count(i, "registro com valor", "registros com valor"), 14, UiKit.MUTED, false);
+            summary(uiKit, linearLayout, vehicle);
         }
         final String[] parts = {"Todos", "Sintomas", "Serviços", "Abastecimentos"};
-        uiKit.button(linearLayout, "Filtrar: " + parts[this.filter], false, () -> {
-            new AlertDialog.Builder(this.activity).setTitle("Mostrar registros").setItems(parts, (dialog, which) -> {
+        boolean sideBySide = this.activity.getResources().getConfiguration().fontScale <= 1.3f && this.activity.getResources().getConfiguration().screenWidthDp >= 340;
+        LinearLayout actions = uiKit.column();
+        actions.setOrientation(sideBySide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        linearLayout.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        Button add = uiKit.button(actions, "Novo registro", true, () -> new LocalizedDialog(this.activity).setTitle("O que você quer registrar?").setItems(new String[]{"Abastecimento", "Serviço", "Sintoma"}, (dialog, which) -> open(new JournalEntry.Kind[]{JournalEntry.Kind.FUEL, JournalEntry.Kind.SERVICE, JournalEntry.Kind.SYMPTOM}[which], null, null)).setNegativeButton("Cancelar", null).show());
+        add.setEnabled((vehicle == null || this.host.demo() || this.saving) ? false : true);
+        Button filter = uiKit.button(actions, "Filtrar: " + parts[this.filter], false, () -> {
+            new LocalizedDialog(this.activity).setTitle("Mostrar registros").setItems(parts, (dialog, which) -> {
                 this.filter = which;
                 this.limit = 20;
                 this.host.changed();
             }).setNegativeButton("Cancelar", null).show();
         });
-        int value = 0;
-        int value2 = 0;
+        if (sideBySide) {
+            LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            first.setMargins(0, 0, uiKit.dp(8), uiKit.dp(12));
+            add.setLayoutParams(first);
+            LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            second.bottomMargin = uiKit.dp(12);
+            filter.setLayoutParams(second);
+        }
+        if (this.host.demo()) {
+            uiKit.label(linearLayout, "Encerre a demonstração para registrar acontecimentos reais informados por você.", 13, UiKit.AMBER, false);
+        }
+        java.util.Map<String, FuelSummary> tanks = new java.util.HashMap<>();
+        if (vehicle != null) {
+            for (FuelSummary tank : FuelSummary.history(this.entries, vehicle.id)) {
+                tanks.put(tank.endId, tank);
+            }
+        }
+        int shown = 0;
+        int matching = 0;
         for (final JournalEntry entry : this.entries) {
             if (vehicle != null && entry.vehicleId.equals(vehicle.id) && (this.filter == 0 || entry.kind.ordinal() == this.filter - 1)) {
-                value2++;
-                if (value < this.limit) {
-                    int value3 = value + 1;
-                    LinearLayout card = uiKit.card(linearLayout, false);
-                    StringBuilder builder = new StringBuilder();
-                    builder.append(entry.title());
-                    builder.append(entry.voided ? " · ANULADO" : "");
-                    uiKit.eyebrow(card, builder.toString());
-                    uiKit.label(card, local(entry.occurredAt), 14, UiKit.MUTED, false);
-                    uiKit.label(card, entry.note.isEmpty() ? "Abastecimento registrado" : entry.note, 17, UiKit.TEXT, true);
-                    StringBuilder builder2 = new StringBuilder("Informado por você · revisão ");
-                    builder2.append(entry.revision);
-                    builder2.append(entry.odometer != null ? " · " + entry.odometer + " km" : "");
-                    uiKit.label(card, builder2.toString(), 12, UiKit.MUTED, false);
-                    if (!entry.dueDate.isEmpty()) {
-                        StringBuilder builder3 = new StringBuilder();
-                        builder3.append(entry.voided ? "Data do registro anulado: " : "Próxima data informada: ");
-                        builder3.append(entry.dueDate);
-                        uiKit.label(card, builder3.toString(), 13, UiKit.MUTED, false);
-                    }
-                    if (entry.dueOdometer != null) {
-                        uiKit.label(card, "Próximo hodômetro informado: " + entry.dueOdometer + " km", 13, UiKit.MUTED, false);
-                    }
-                    uiKit.button(card, "Ver registro", false, () -> this.detail(entry));
-                    value = value3;
+                matching++;
+                if (shown < this.limit) {
+                    entry(uiKit, linearLayout, entry, shown == 0, tanks.get(entry.id));
+                    shown++;
                 }
             }
         }
-        if (value2 == 0) {
+        if (matching == 0) {
             uiKit.label(linearLayout, "Nenhum registro neste filtro. Comece pelo que você percebeu ou fez no carro.", 15, UiKit.MUTED, false);
         }
-        if (value2 > this.limit) {
+        if (matching > this.limit) {
             uiKit.button(linearLayout, "Mostrar mais registros", false, () -> {
                 this.limit += 20;
                 this.host.changed();
             });
         }
+        if (vehicle != null) {
+            calculations(uiKit, uiKit.disclosure(linearLayout, "Consumo, custos e lembretes"), vehicle);
+        }
         LinearLayout disclosure = uiKit.disclosure(linearLayout, "Opções do diário");
         uiKit.button(disclosure, "Exportar diário deste veículo", false, () -> this.exportVehicle(vehicle)).setEnabled((vehicle == null || !this.entries.stream().anyMatch((obj) -> ((JournalEntry) obj).vehicleId.equals(vehicle.id)) || this.saving) ? false : true);
         uiKit.button(disclosure, "Diários de perfis removidos", false, () -> this.detached()).setEnabled(this.entries.stream().anyMatch((obj) -> this.isDetached((JournalEntry) obj)));
-        uiKit.label(disclosure, "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Restaurar backup ainda não faz parte deste diário.", 12, UiKit.MUTED, false);
+        uiKit.label(disclosure, "Serviços com data ou quilometragem viram lembretes: aparecem em Hoje e geram notificação quando faltam 7 dias ou 500 km, se os lembretes estiverem ligados em Ajustes. Registrar o mesmo serviço sem novo prazo conclui o lembrete. Backup completo e restauração estão em Ajustes.", 12, UiKit.MUTED, false);
+    }
+
+    private void summary(UiKit uiKit, LinearLayout linearLayout, VehicleProfile vehicle) {
+        FuelSummary fuel = FuelSummary.latest(this.entries, vehicle.id);
+        JournalEntry reminder = MaintenanceReminders.next(this.entries, vehicle.id, WallClock.today());
+        JournalEntry last = null;
+        for (JournalEntry entry : this.entries) {
+            if (entry.vehicleId.equals(vehicle.id) && !entry.voided && (last == null || entry.occurredAt > last.occurredAt)) {
+                last = entry;
+            }
+        }
+        LinearLayout card = uiKit.card(linearLayout, false);
+        card.setTag(SUMMARY);
+        card.setPadding(uiKit.dp(14), uiKit.dp(12), uiKit.dp(14), uiKit.dp(8));
+        ((LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = uiKit.dp(12);
+        boolean columns = this.activity.getResources().getConfiguration().fontScale <= 1.3f && this.activity.getResources().getConfiguration().screenWidthDp >= 340;
+        card.setOrientation(columns ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        fact(uiKit, card, columns, "CONSUMO", fuel.kmPerLiter == null ? "—" : Format.decimal(fuel.kmPerLiter) + " km/L", fuel.kmPerLiter == null ? "aguardando um intervalo completo" : "último tanque cheio a cheio", false);
+        if (reminder == null) {
+            fact(uiKit, card, columns, "PRÓXIMO SERVIÇO", "—", "sem lembrete registrado", false);
+        } else {
+            HomeScreen.Due due = HomeScreen.due(reminder);
+            fact(uiKit, card, columns, "PRÓXIMO SERVIÇO", due.value, reminder.note.isEmpty() ? due.detail : reminder.note, due.overdue);
+        }
+        fact(uiKit, card, columns, "ÚLTIMO REGISTRO", last == null ? "—" : local(last.occurredAt).substring(0, 10), last == null ? "nenhum registro ainda" : last.title(), false);
+    }
+
+    private static void fact(UiKit uiKit, LinearLayout card, boolean columns, String title, String value, String detail, boolean attention) {
+        LinearLayout item = uiKit.column();
+        if (columns) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            if (card.getChildCount() > 0) {
+                params.setMarginStart(uiKit.dp(10));
+            }
+            card.addView(item, params);
+        } else {
+            card.addView(item, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        uiKit.label(item, title, 10, UiKit.ACCENT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        uiKit.label(item, value, 15, attention ? UiKit.AMBER : UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(2));
+        TextView small = uiKit.label(item, detail, 11, attention ? UiKit.AMBER : UiKit.MUTED, false);
+        small.setPadding(0, 0, 0, uiKit.dp(columns ? 4 : 8));
+        small.setMaxLines(columns ? 2 : 3);
+        small.setEllipsize(TextUtils.TruncateAt.END);
+    }
+
+    private void entry(UiKit uiKit, LinearLayout linearLayout, final JournalEntry entry, boolean first, FuelSummary tank) {
+        LinearLayout card = uiKit.card(linearLayout, false);
+        card.setPadding(uiKit.dp(16), uiKit.dp(12), uiKit.dp(16), uiKit.dp(8));
+        ((LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = uiKit.dp(10);
+        if (first) {
+            card.setTag(FIRST_ENTRY);
+        }
+        StringBuilder title = new StringBuilder(entry.title());
+        if (entry.kind == JournalEntry.Kind.FUEL && !"Não sei".equals(entry.fuel)) {
+            title.append(" · ").append(entry.fuel);
+        }
+        title.append(entry.voided ? " · ANULADO" : "");
+        uiKit.eyebrow(card, title.toString());
+        if (entry.kind == JournalEntry.Kind.FUEL) {
+            StringBuilder fill = new StringBuilder(Format.decimal(entry.liters) + " L");
+            if (entry.cost != null && entry.liters.signum() > 0) {
+                fill.append(" · ").append(Format.money(entry.cost.divide(entry.liters, 2, java.math.RoundingMode.HALF_UP))).append("/L");
+            }
+            fill.append(entry.fullTank ? " · tanque cheio" : " · parcial");
+            uiKit.label(card, fill.toString(), 16, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(4));
+            if (tank != null) {
+                uiKit.label(card, "Consumo deste tanque: " + Format.decimal(tank.kmPerLiter) + " km/L" + (tank.costPerKm == null ? "" : " · " + Format.money(tank.costPerKm) + "/km"), 13, UiKit.ACCENT, true).setPadding(0, 0, 0, uiKit.dp(4));
+            }
+            if (!entry.note.isEmpty()) {
+                uiKit.label(card, entry.note, 13, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+            }
+        } else {
+            uiKit.label(card, entry.note.isEmpty() ? entry.title() : entry.note, 16, UiKit.TEXT, true).setPadding(0, 0, 0, uiKit.dp(4));
+        }
+        StringBuilder meta = new StringBuilder(local(entry.occurredAt));
+        meta.append(entry.odometer != null ? " · " + Format.km(entry.odometer) : "");
+        meta.append(entry.cost != null ? " · " + Format.money(entry.cost) : "");
+        uiKit.label(card, meta.toString(), 12, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+        if (!entry.dueDate.isEmpty()) {
+            uiKit.label(card, (entry.voided ? "Data do registro anulado: " : "Próxima data informada: ") + day(entry.dueDate), 12, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+        }
+        if (entry.dueOdometer != null) {
+            uiKit.label(card, "Próximo hodômetro informado: " + Format.km(entry.dueOdometer), 12, UiKit.MUTED, false).setPadding(0, 0, 0, uiKit.dp(4));
+        }
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setMinimumHeight(uiKit.dp(48));
+        card.setOnClickListener((view) -> this.detail(entry));
+        card.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, I18n.t("Ver registro")));
+            }
+        });
+        Motion.press(card);
+    }
+
+    private void calculations(UiKit uiKit, LinearLayout disclosure, VehicleProfile vehicle) {
+        final FuelSummary latest = FuelSummary.latest(this.entries, vehicle.id);
+        uiKit.eyebrow(disclosure, "CONSUMO POR ABASTECIMENTOS");
+        uiKit.label(disclosure, latest.explanation, 13, UiKit.MUTED, false);
+        if (latest.kmPerLiter != null) {
+            uiKit.button(disclosure, "Como foi calculado", false, () -> message("Distância: " + latest.distance + " km\nVolume: " + latest.liters + " L\n" + latest.explanation + "\nEntradas e revisões: " + String.join(", ", latest.entryRevisions)));
+        }
+        List<FuelSummary> history = FuelSummary.history(this.entries, vehicle.id);
+        if (history.size() > 1) {
+            BigDecimal distance = BigDecimal.ZERO;
+            BigDecimal liters = BigDecimal.ZERO;
+            for (FuelSummary tank : history) {
+                distance = distance.add(tank.distance);
+                liters = liters.add(tank.liters);
+            }
+            uiKit.label(disclosure, "Média de " + history.size() + " tanques: " + Format.decimal(distance.divide(liters, 2, java.math.RoundingMode.HALF_UP)) + " km/L", 14, UiKit.TEXT, true);
+            StringBuilder recent = new StringBuilder();
+            for (int i = history.size() - 1; i >= Math.max(0, history.size() - 6); i--) {
+                FuelSummary tank = history.get(i);
+                recent.append(local(tank.endedAt).substring(0, 10)).append(" · ").append(Format.decimal(tank.kmPerLiter)).append(" km/L");
+                if (tank.costPerKm != null) {
+                    recent.append(" · ").append(Format.money(tank.costPerKm)).append("/km");
+                }
+                recent.append(i > Math.max(0, history.size() - 6) ? "\n" : "");
+            }
+            uiKit.label(disclosure, recent.toString(), 13, UiKit.MUTED, false);
+        }
+        java.util.Map<String, BigDecimal> perKm = FuelSummary.averageCostPerKm(history);
+        if (perKm.containsKey("Gasolina") && perKm.containsKey("Etanol")) {
+            String cheaper = perKm.get("Etanol").compareTo(perKm.get("Gasolina")) < 0 ? "o etanol saiu mais barato" : "a gasolina saiu mais barata";
+            uiKit.label(disclosure, "No seu carro, " + cheaper + ": etanol " + Format.money(perKm.get("Etanol")) + "/km, gasolina " + Format.money(perKm.get("Gasolina")) + "/km.", 14, UiKit.TEXT, false);
+        } else {
+            BigDecimal ethanol = FuelSummary.lastPrice(this.entries, vehicle.id, "Etanol");
+            BigDecimal gasoline = FuelSummary.lastPrice(this.entries, vehicle.id, "Gasolina");
+            if (ethanol != null && gasoline != null && gasoline.signum() > 0) {
+                int ratio = ethanol.multiply(BigDecimal.valueOf(100)).divide(gasoline, 0, java.math.RoundingMode.HALF_UP).intValue();
+                uiKit.label(disclosure, "Etanol a " + ratio + "% do preço da gasolina nos seus últimos abastecimentos. " + (ratio <= 70 ? "Pela regra dos 70%, o etanol tende a compensar." : "Pela regra dos 70%, a gasolina tende a compensar."), 14, UiKit.TEXT, false);
+            } else {
+                uiKit.label(disclosure, "Etanol costuma compensar quando custa até 70% do preço da gasolina. Registre preço dos dois para comparar com o seu carro.", 13, UiKit.MUTED, false);
+            }
+        }
+        BigDecimal month = FuelSummary.spentSince(this.entries, vehicle.id, System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000);
+        if (month.signum() > 0) {
+            uiKit.label(disclosure, "Combustível nos últimos 30 dias: " + Format.money(month), 14, UiKit.TEXT, false);
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        int count = 0;
+        for (JournalEntry journalEntry : this.entries) {
+            if (journalEntry.vehicleId.equals(vehicle.id) && !journalEntry.voided && journalEntry.cost != null) {
+                total = total.add(journalEntry.cost);
+                count++;
+            }
+        }
+        uiKit.label(disclosure, count == 0 ? "Custos ainda não informados." : "Total informado: " + Format.money(total) + " · " + Format.count(count, "registro com valor", "registros com valor"), 14, UiKit.TEXT, false);
     }
 
     boolean isDetached(JournalEntry journalEntry) {
         return !this.host.vehicleIds().contains(journalEntry.vehicleId);
     }
 
+    private static String day(String isoDate) {
+        try {
+            return java.time.LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (java.time.format.DateTimeParseException e) {
+            return isoDate;
+        }
+    }
+
     private static String local(long occurredAt) {
-        return Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm"));
+        return Instant.ofEpochMilli(occurredAt).atZone(WallClock.zone()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm"));
     }
 
     private void open(JournalEntry.Kind kind, JournalEntry journalEntry, Bundle bundle) {
@@ -272,7 +432,7 @@ public final class JournalController {
             return;
         }
         try {
-            JournalEditor journalEditor = new JournalEditor(this.activity, vehicle, kind, journalEntry, bundle, new JournalEditor.Save() {
+            JournalEditor journalEditor = new JournalEditor(this.activity, vehicle, kind, journalEntry, bundle, defaults(vehicle), new JournalEditor.Save() {
                 @Override
                 public final void save(JournalEntry journalEntry2, JournalEditor.Completion completion) {
                     JournalController.this.saveJournalEntry(journalEntry2, completion);
@@ -283,6 +443,30 @@ public final class JournalController {
         } catch (Exception e) {
             message("Não foi possível abrir o registro: " + e.getMessage());
         }
+    }
+
+    public void add(JournalEntry.Kind kind) {
+        if (this.ready && this.host.vehicle() != null) {
+            open(kind, null, null);
+        }
+    }
+
+    private JournalEditor.Defaults defaults(VehicleProfile vehicle) {
+        JournalEntry farthest = null;
+        JournalEntry lastFill = null;
+        for (JournalEntry entry : this.entries) {
+            if (!entry.vehicleId.equals(vehicle.id) || entry.voided) {
+                continue;
+            }
+            if (entry.odometer != null && (farthest == null || entry.odometer.compareTo(farthest.odometer) > 0)) {
+                farthest = entry;
+            }
+            if (entry.kind == JournalEntry.Kind.FUEL && !"Não sei".equals(entry.fuel) && (lastFill == null || entry.occurredAt > lastFill.occurredAt)) {
+                lastFill = entry;
+            }
+        }
+        String fuel = lastFill != null ? lastFill.fuel : JournalEntry.FUELS.contains(vehicle.fuel) ? vehicle.fuel : "Não sei";
+        return new JournalEditor.Defaults(farthest == null ? null : farthest.odometer, farthest == null ? 0 : farthest.occurredAt, fuel);
     }
 
     void saveJournalEntry(final JournalEntry journalEntry, final JournalEditor.Completion completion) {
@@ -300,6 +484,9 @@ public final class JournalController {
                         this.entries = latest;
                         completion.complete(null);
                         this.host.changed();
+                        if (journalEntry.kind == JournalEntry.Kind.SERVICE && journalEntry.revision == 1 && (!journalEntry.dueDate.isEmpty() || journalEntry.dueOdometer != null)) {
+                            this.host.offerReminders();
+                        }
                     });
                 } catch (Exception e) {
                     post(() -> {
@@ -320,13 +507,13 @@ public final class JournalController {
                 uiKit.label(column, line, 14, UiKit.TEXT, false);
             }
         }
-        final AlertDialog alertDialog = new AlertDialog.Builder(this.activity).setTitle(journalEntry.title()).setPositiveButton("Fechar", null).create();
+        final AlertDialog alertDialog = new LocalizedDialog(this.activity).setTitle(journalEntry.title()).setPositiveButton("Fechar", null).create();
         uiKit.button(column, "Corrigir registro", false, () -> {
             alertDialog.dismiss();
             open(journalEntry.kind, journalEntry, null);
         }).setEnabled((journalEntry.voided || this.saving || this.host.demo() || this.host.vehicle() == null || !this.host.vehicle().id.equals(journalEntry.vehicleId)) ? false : true);
         uiKit.button(column, journalEntry.voided ? "Reativar registro" : "Anular registro", false, () -> {
-            new AlertDialog.Builder(this.activity).setTitle(journalEntry.voided ? "Reativar registro?" : "Anular registro?").setMessage("Isso cria uma revisão e recalcula custos e consumo. As revisões anteriores continuam preservadas. Anule somente registros que não devem entrar nos cálculos.").setNegativeButton("Cancelar", null).setPositiveButton("Confirmar", (dialog, which) -> {
+            new LocalizedDialog(this.activity).setTitle(journalEntry.voided ? "Reativar registro?" : "Anular registro?").setMessage("Isso cria uma revisão e recalcula custos e consumo. As revisões anteriores continuam preservadas. Anule somente registros que não devem entrar nos cálculos.").setNegativeButton("Cancelar", null).setPositiveButton("Confirmar", (dialog, which) -> {
                 if (this.saving || this.host.demo()) {
                     return;
                 }
@@ -359,7 +546,7 @@ public final class JournalController {
                     for (int i = 0; i < size; i++) {
                         parts[i] = "Revisão " + ((JournalEntry) revisions.get(i)).revision + " · " + local(((JournalEntry) revisions.get(i)).revisedAt);
                     }
-                    new AlertDialog.Builder(this.activity).setTitle("Revisões preservadas").setItems(parts, (dialog, which) -> message(String.join("\n\n", JournalJson.lines((JournalEntry) revisions.get(which))))).setNegativeButton("Fechar", null).show();
+                    new LocalizedDialog(this.activity).setTitle("Revisões preservadas").setItems(parts, (dialog, which) -> message(String.join("\n\n", JournalJson.lines((JournalEntry) revisions.get(which))))).setNegativeButton("Fechar", null).show();
                 });
             } catch (Exception e) {
                 post(() -> message(e.getMessage()));
@@ -385,7 +572,7 @@ public final class JournalController {
         for (int i = 0; i < size; i++) {
             parts[i] = ((JournalEntry) items.get(i)).vehicleName + " · " + ((JournalEntry) items.get(i)).title() + " · " + local(((JournalEntry) items.get(i)).occurredAt);
         }
-        new AlertDialog.Builder(this.activity).setTitle("Perfis removidos · registros preservados").setItems(parts, (dialog, which) -> detail((JournalEntry) items.get(which))).setNegativeButton("Fechar", null).show();
+        new LocalizedDialog(this.activity).setTitle("Perfis removidos · registros preservados").setItems(parts, (dialog, which) -> detail((JournalEntry) items.get(which))).setNegativeButton("Fechar", null).show();
     }
 
     public void exportVehicle(VehicleProfile vehicleProfile) {
@@ -410,7 +597,7 @@ public final class JournalController {
             message("Conclua ou cancele a exportação anterior.");
             return;
         }
-        new AlertDialog.Builder(this.activity).setTitle("Revisar exportação").setMessage("O arquivo incluirá " + Format.count(list.size(), "registro", "registros") + " e suas revisões anteriores, com nomes, notas, datas, hodômetro, combustível e valores informados. Confira se deseja incluir esse conteúdo antes de escolher onde salvar. Não há envio automático pela internet.").setNegativeButton("Cancelar", null).setPositiveButton("Preparar arquivo", (dialog, which) -> prepareExport(list)).show();
+        new LocalizedDialog(this.activity).setTitle("Revisar exportação").setMessage("O arquivo incluirá " + Format.count(list.size(), "registro", "registros") + " e suas revisões anteriores, com nomes, notas, datas, hodômetro, combustível e valores informados. Confira se deseja incluir esse conteúdo antes de escolher onde salvar. Não há envio automático pela internet.").setNegativeButton("Cancelar", null).setPositiveButton("Preparar arquivo", (dialog, which) -> prepareExport(list)).show();
     }
 
     private void prepareExport(final List<JournalEntry> list) {
@@ -540,7 +727,7 @@ public final class JournalController {
     }
 
     private void message(String message) {
-        new AlertDialog.Builder(this.activity).setMessage(message).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(this.activity).setMessage(message).setPositiveButton("Fechar", null).show();
     }
 
     public Bundle state() throws Exception {

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 public final class DtcReference {
-    public static final String VERSION = "generic-dtc-2";
+    public static final String VERSION = "generic-dtc-3";
 
     static final SourceReference FORD_GENERIC = new SourceReference("ford-pced-1999-generic-p0",
             "PCED On Board Diagnostics II", "Ford Motor Company", "1999 PCED / Section 4",
@@ -23,6 +23,16 @@ public final class DtcReference {
             "CODE_MEANING_REFERENCE_ONLY_ROUTAN_2012",
             "Somente conferência do significado genérico; boletim/procedimento Routan não se aplica a outros veículos.");
 
+    static final SourceReference FORD_2014 = new SourceReference("ford-boss302s-2014-obd-codes",
+            "2014 OBD-II 5 Digit Code Interpretation", "Ford Motor Company · Ford Performance Parts", "2014 Boss 302S",
+            "https://www.performanceparts.ford.com/download/boss302spdfs/2014/2014%20BOSS%20302S%20OBDII%20Codes.pdf",
+            "Tabela de códigos, páginas 1 a 93", "2026-11-01",
+            "CODE_MEANING_REFERENCE_ONLY_OTHER_CONFIGURATION",
+            "Somente conferência do significado genérico (SHA-256 38b56df0e234b89eae1854823cfa4e7b5331f2da3be18ef78102b428305f8627); o carro de competição Boss 302S e seus procedimentos não se aplicam a outros veículos.");
+
+    private static final String Q_TIMING = "O motor perdeu força, fez barulho de corrente ou teve partida difícil? Houve troca de correia, corrente ou óleo recente?";
+    private static final String Q_BATTERY = "A bateria é antiga ou o carro teve dificuldade para ligar? Algum acessório elétrico foi instalado?";
+    private static final String Q_NETWORK = "Outros avisos do painel acenderam junto? O alerta apareceu após troca de bateria ou serviço elétrico?";
     private static final String Q_SENSOR = "O alerta aparece sempre ou só em certas condições (frio, chuva, trepidação)? Houve serviço elétrico recente perto do sensor?";
     private static final String Q_MIXTURE = "Qual combustível foi usado e quando o comportamento foi percebido?";
     private static final String Q_OXYGEN = "Em que condição o alerta apareceu e quais outros códigos foram registrados?";
@@ -123,6 +133,32 @@ public final class DtcReference {
                 ford("P0722", "Sem sinal do sensor de rotação do eixo de saída da transmissão.", Q_TRANSMISSION),
                 ford("P0723", "Falha intermitente no circuito do sensor de rotação do eixo de saída da transmissão.", Q_TRANSMISSION),
                 ford("P0812", "Falha no circuito de entrada do interruptor de marcha à ré.", Q_SWITCH),
+                ford2014("P0011", 1, "Comando de admissão A adiantado além do previsto (banco 1).", Q_TIMING),
+                ford2014("P0012", 1, "Comando de admissão A atrasado além do previsto (banco 1).", Q_TIMING),
+                ford2014("P0014", 1, "Comando de escape B adiantado além do previsto (banco 1).", Q_TIMING),
+                ford2014("P0016", 1, "Posição do virabrequim e do comando de válvulas fora de correlação (banco 1, sensor A).", Q_TIMING),
+                ford2014("P0017", 1, "Posição do virabrequim e do comando de válvulas fora de correlação (banco 1, sensor B).", Q_TIMING),
+                ford2014("P0018", 1, "Posição do virabrequim e do comando de válvulas fora de correlação (banco 2, sensor A).", Q_TIMING),
+                ford2014("P0019", 1, "Posição do virabrequim e do comando de válvulas fora de correlação (banco 2, sensor B).", Q_TIMING),
+                ford2014("P0068", 2, "Pressão do coletor ou fluxo de ar fora de correlação com a posição da borboleta.", Q_SENSOR),
+                ford2014("P0101", 4, "Faixa ou desempenho do sensor de fluxo de ar (MAF) fora do esperado.", Q_SENSOR),
+                ford2014("P0128", 5, "Válvula termostática: temperatura do motor abaixo da temperatura de regulagem.", Q_TEMPERATURE),
+                ford2014("P0219", 8, "Rotação do motor acima do limite.", Q_SPEED),
+                ford2014("P0335", 12, "Falha no circuito do sensor de posição do virabrequim (CKP) A.", Q_IGNITION),
+                ford2014("P0336", 12, "Faixa ou desempenho do sensor de posição do virabrequim (CKP) A fora do esperado.", Q_IGNITION),
+                ford2014("P0506", 17, "Marcha lenta abaixo do esperado.", Q_SPEED),
+                ford2014("P0507", 17, "Marcha lenta acima do esperado.", Q_SPEED),
+                ford2014("P0562", 18, "Tensão do sistema baixa.", Q_BATTERY),
+                ford2014("P0563", 18, "Tensão do sistema alta.", Q_BATTERY),
+                ford2014("P0627", 21, "Circuito de controle da bomba de combustível A aberto.", Q_FUEL),
+                ford2014("P0641", 21, "Circuito da tensão de referência dos sensores A aberto.", Q_SENSOR),
+                ford2014("U0001", 90, "Falha no barramento de comunicação CAN de alta velocidade.", Q_NETWORK),
+                ford2014("U0073", 91, "Barramento de comunicação A entre módulos desligado.", Q_NETWORK),
+                ford2014("U0100", 91, "Comunicação perdida com o módulo do motor (ECM/PCM) A.", Q_NETWORK),
+                ford2014("U0101", 91, "Comunicação perdida com o módulo da transmissão (TCM).", Q_NETWORK),
+                ford2014("U0121", 91, "Comunicação perdida com o módulo do ABS.", Q_NETWORK),
+                ford2014("U0140", 92, "Comunicação perdida com o módulo da carroceria (BCM).", Q_NETWORK),
+                ford2014("U0155", 93, "Comunicação perdida com o painel de instrumentos.", Q_NETWORK),
                 vw("P0302", "Falha de combustão indicada no cilindro 2.", Q_MISFIRE),
                 vw("P0303", "Falha de combustão indicada no cilindro 3.", Q_MISFIRE),
                 vw("P0304", "Falha de combustão indicada no cilindro 4.", Q_MISFIRE),
@@ -152,6 +188,10 @@ public final class DtcReference {
         return new DtcDefinition(VERSION, code, meaning, question, "1999 PCED Section 4, linha " + code, Collections.singletonList(FORD_GENERIC.id));
     }
 
+    private static DtcDefinition ford2014(String code, int page, String meaning, String question) {
+        return new DtcDefinition(VERSION, code, meaning, question, "Ford 2014 OBD-II, página " + page + ", linha " + code, Collections.singletonList(FORD_2014.id));
+    }
+
     private static DtcDefinition vw(String code, String meaning, String question) {
         return new DtcDefinition(VERSION, code, meaning, question, "Boletim 24Y2, página 3, linha " + code, Collections.singletonList(VW_GENERIC.id));
     }
@@ -170,6 +210,9 @@ public final class DtcReference {
         }
         if (VW_GENERIC.id.equals(id)) {
             return VW_GENERIC;
+        }
+        if (FORD_2014.id.equals(id)) {
+            return FORD_2014;
         }
         return DtcCatalog.source(id);
     }

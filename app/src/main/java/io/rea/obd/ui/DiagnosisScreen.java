@@ -13,6 +13,7 @@ import android.widget.TextView;
 import io.rea.obd.diagnostics.DtcFormatter;
 import io.rea.obd.diagnostics.DtcObservation;
 import io.rea.obd.diagnostics.DtcReadResult;
+import io.rea.obd.diagnostics.ReadingGuide;
 import io.rea.obd.model.DataOrigin;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -97,7 +98,7 @@ public final class DiagnosisScreen {
     private static TextView badge(UiKit ui, boolean clean) {
         TextView badge = new TextView(ui.context);
         badge.setText(clean ? "✓" : "!");
-        badge.setTextSize(22.0f);
+        badge.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 22.0f);
         badge.setGravity(Gravity.CENTER);
         badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         int tone = clean ? ui.palette.accent : ui.palette.attention;
@@ -108,6 +109,51 @@ public final class DiagnosisScreen {
         badge.setBackground(circle);
         badge.setImportantForAccessibility(TextView.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return badge;
+    }
+
+    public interface CodeAction {
+        void open(String code);
+    }
+
+    public static void explanation(LinearLayout parent, DtcReadResult read, CodeAction sources) {
+        UiKit ui = new UiKit(parent.getContext());
+        ui.eyebrow(parent, "O QUE A LEITURA MOSTROU");
+        for (String line : ReadingGuide.context(read)) {
+            ui.label(parent, line, 14, line.startsWith("Algumas") ? UiKit.AMBER : UiKit.TEXT, false);
+        }
+        for (ReadingGuide.Code code : ReadingGuide.codes(read)) {
+            LinearLayout card = ui.card(parent, false);
+            card.setTag("explanation-" + code.code);
+            ui.label(card, code.code, 24, UiKit.AMBER, true);
+            ui.label(card, code.statuses(), 13, UiKit.MUTED, true);
+            ui.label(card, code.meaning == null ? ReadingGuide.NO_MEANING : code.meaning, 15, code.meaning == null ? UiKit.MUTED : UiKit.TEXT, code.meaning != null);
+            if (code.structure != null) {
+                ui.label(card, code.structure, 13, UiKit.ACCENT, true);
+            }
+            io.rea.obd.knowledge.DtcGuidance guidance = io.rea.obd.knowledge.DtcGuidance.of(code.code);
+            ui.eyebrow(card, "POSSO CONTINUAR RODANDO?");
+            ui.label(card, guidance.headline(), 15, guidance.urgent() ? UiKit.AMBER : UiKit.TEXT, true);
+            ui.label(card, guidance.advice, 13, UiKit.TEXT, false);
+            if (!guidance.causes.isEmpty()) {
+                ui.eyebrow(card, "CAUSAS COMUNS · NÃO CONFIRMADAS");
+                for (String cause : guidance.causes) {
+                    ui.label(card, "• " + cause, 13, UiKit.TEXT, false);
+                }
+            }
+            ui.eyebrow(card, "EVIDÊNCIA");
+            for (String line : code.evidence()) {
+                ui.label(card, line, 13, UiKit.TEXT, false);
+            }
+            if (code.question != null) {
+                ui.label(card, "Pergunta de contexto: " + code.question, 13, UiKit.MUTED, false);
+            }
+            ui.button(card, "Fontes de " + code.code, false, () -> sources.open(code.code));
+        }
+        ui.eyebrow(parent, "PRÓXIMOS PASSOS");
+        for (String line : ReadingGuide.nextSteps()) {
+            ui.label(parent, "• " + line, 14, UiKit.TEXT, false);
+        }
+        ui.label(parent, ReadingGuide.SCOPE, 12, UiKit.MUTED, false);
     }
 
     public static void shortcuts(LinearLayout linearLayout, Runnable runnable, Runnable runnable2) {
@@ -137,7 +183,7 @@ public final class DiagnosisScreen {
             progressBar.setMax(2);
             progressBar.setProgress(i);
             progressBar.setProgressTintList(ColorStateList.valueOf(uiKit.palette.accent));
-            progressBar.setContentDescription(i + " de 2 grupos de consultas encerrados");
+            progressBar.setContentDescription(I18n.t(i + " de 2 grupos de consultas encerrados"));
             linearLayout.addView(progressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, uiKit.dp(8)));
         }
     }

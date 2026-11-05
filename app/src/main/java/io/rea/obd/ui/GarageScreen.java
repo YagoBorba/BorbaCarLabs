@@ -34,7 +34,7 @@ public final class GarageScreen {
     public static void render(final LinearLayout linearLayout, final List<VehicleRecord> list, final String id, final boolean profileLocked, final VehicleCatalogStore.Loaded loaded, final Actions actions) {
         UiKit uiKit = new UiKit(linearLayout.getContext());
         uiKit.eyebrow(linearLayout, "SEUS VEÍCULOS");
-        uiKit.label(linearLayout, "Garagem", 30, UiKit.TEXT, true);
+        uiKit.title(linearLayout, "Garagem", 30);
         uiKit.label(linearLayout, "Selecione o carro que vai acompanhar.", 15, UiKit.MUTED, false);
         Objects.requireNonNull(actions);
         uiKit.button(linearLayout, "Adicionar veículo", true, () -> actions.add()).setEnabled(!profileLocked);
@@ -123,7 +123,7 @@ public final class GarageScreen {
         if (i > 0) {
             uiKit.label(column, "Você pode completar os detalhes restantes quando precisar.", 13, UiKit.MUTED, false);
         }
-        final AlertDialog alertDialog = new AlertDialog.Builder(linearLayout.getContext()).setTitle(vehicleRecord.name).setPositiveButton("Fechar", null).create();
+        final AlertDialog alertDialog = new LocalizedDialog(linearLayout.getContext()).setTitle(vehicleRecord.name).setPositiveButton("Fechar", null).create();
         uiKit.button(column, "Editar perfil", true, () -> {
             alertDialog.dismiss();
             actions.edit(vehicleRecord);
@@ -158,7 +158,7 @@ public final class GarageScreen {
         ScrollView scrollView = new ScrollView(linearLayout.getContext());
         scrollView.setBackgroundColor(uiKit.palette.bg);
         scrollView.addView(column);
-        new AlertDialog.Builder(linearLayout.getContext()).setTitle("Identificação · " + vehicleRecord.name).setView(scrollView).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(linearLayout.getContext()).setTitle("Identificação · " + vehicleRecord.name).setView(scrollView).setPositiveButton("Fechar", null).show();
     }
 
     public static void sources(LinearLayout linearLayout, VehicleCatalogStore.Loaded loaded) {
@@ -175,6 +175,6 @@ public final class GarageScreen {
         ScrollView scrollView = new ScrollView(linearLayout.getContext());
         scrollView.setBackgroundColor(uiKit.palette.bg);
         scrollView.addView(column);
-        new AlertDialog.Builder(linearLayout.getContext()).setTitle("Fontes e cobertura").setView(scrollView).setPositiveButton("Fechar", null).show();
+        new LocalizedDialog(linearLayout.getContext()).setTitle("Fontes e cobertura").setView(scrollView).setPositiveButton("Fechar", null).show();
     }
 }

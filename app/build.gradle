@@ -10,8 +10,8 @@ android {
         applicationId "io.rea.obd"
         minSdk 26
         targetSdk 35
-        versionCode 24
-        versionName "1.1.1"
+        versionCode 25
+        versionName "1.2.0"
     }
 
     def keystoreFile = rootProject.file("keystore.properties")
@@ -46,6 +46,10 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
+            all {
+                systemProperty "screenshots.update", project.hasProperty("updateScreenshots")
+                inputs.dir "src/test/screenshots"
+            }
         }
     }
 

@@ -23,7 +23,7 @@ import org.robolectric.annotation.GraphicsMode;
 
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = 35, qualifiers = "w393dp-h852dp-xhdpi")
+@Config(sdk = 35, qualifiers = "pt-rBR-w393dp-h852dp-xhdpi")
 public class ScreensTest {
     private static final File OUT = new File("build/screenshots");
 
@@ -76,6 +76,168 @@ public class ScreensTest {
     }
 
     @Test
+    public void diagnosisShowsTheResultBeforeTheConnectionControls() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.DIAGNOSIS);
+        idle();
+        String before = texts(activity.getWindow().getDecorView());
+        assertTrue(before.indexOf("Iniciar leitura guiada") >= 0);
+        assertFalse(before.contains("Conexão e nova leitura"));
+
+        activity.scan();
+        waitForWorkers();
+        View root = activity.getWindow().getDecorView();
+        String after = texts(root);
+        int verdict = after.indexOf("códigos de falha encontrados");
+        int connection = after.indexOf("Conexão e nova leitura");
+        assertTrue(verdict >= 0);
+        assertTrue(connection > verdict);
+        assertTrue(after.indexOf("Iniciar leitura guiada") > connection);
+        View controls = root.findViewWithTag("disclosure-Conexão e nova leitura");
+        assertNotNull(controls);
+        android.view.ViewGroup parent = (android.view.ViewGroup) controls.getParent();
+        View content = parent.getChildAt(parent.indexOfChild(controls) + 1);
+        assertTrue(content.getVisibility() == View.GONE);
+        controls.performClick();
+        assertTrue(content.getVisibility() == View.VISIBLE);
+        capture(activity, "14-diagnostico-resultado-primeiro");
+        controller.pause().stop().destroy();
+    }
+
+    @Test
+    public void readingWithCodesOffersToUnderstandItAndPrepareAWorkshopSummary() throws Exception {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.DIAGNOSIS);
+        activity.scan();
+        waitForWorkers();
+        View root = activity.getWindow().getDecorView();
+        View understand = root.findViewWithTag("action-understand");
+        View workshop = root.findViewWithTag("action-workshop");
+        for (View action : new View[]{understand, workshop}) {
+            assertNotNull(action);
+            android.graphics.Rect visible = new android.graphics.Rect();
+            assertTrue(action.getGlobalVisibleRect(visible));
+            assertTrue(visible.height() == action.getHeight());
+        }
+        capture(activity, "16-diagnostico-proximos-passos");
+
+        understand.performClick();
+        idle();
+        android.app.AlertDialog explanation = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        assertTrue(explanation.isShowing());
+        View dialogRoot = explanation.getWindow().getDecorView();
+        assertNotNull(dialogRoot.findViewWithTag("explanation-P0133"));
+        assertNotNull(dialogRoot.findViewWithTag("explanation-P0301"));
+        String explained = texts(dialogRoot);
+        assertTrue(explained.contains("Falha de combustão indicada no cilindro 1."));
+        assertTrue(explained.contains("Pendente (serviço 07)"));
+        assertTrue(explained.contains("PRÓXIMOS PASSOS"));
+        explanation.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).performClick();
+        idle();
+
+        android.app.AlertDialog summary = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        assertTrue(summary != explanation && summary.isShowing());
+        String message = shadowOf(summary).getMessage().toString();
+        assertTrue(message.startsWith("Resumo para oficina · BorbaCar Labs"));
+        assertTrue(message.contains("P0133 · Armazenado"));
+        assertTrue(message.contains("P0301 · Pendente"));
+        assertTrue(message.contains("sem internet"));
+        assertTrue("Salvar PDF".contentEquals(summary.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).getText()));
+        summary.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();
+        idle();
+        android.content.Intent chooser = shadowOf(activity).getNextStartedActivity();
+        assertNotNull(chooser);
+        android.content.Intent send = chooser.getParcelableExtra(android.content.Intent.EXTRA_INTENT);
+        assertTrue(android.content.Intent.ACTION_SEND.equals(send.getAction()));
+        assertTrue(send.getStringExtra(android.content.Intent.EXTRA_TEXT).equals(message));
+        controller.pause().stop().destroy();
+    }
+
+    @Test
+    public void journalShowsTheSummaryAndEntriesOnTheFirstScreen() throws Exception {
+        seedVehicleAndJournal();
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        waitForWorkers();
+        activity.startDemo();
+        activity.navigate(NavigationState.JOURNAL);
+        waitForWorkers();
+        capture(activity, "17-diario-compacto");
+        View root = activity.getWindow().getDecorView();
+        View summary = root.findViewWithTag(io.rea.obd.ui.JournalController.SUMMARY);
+        assertNotNull(summary);
+        String facts = texts(summary);
+        assertTrue(facts.contains("12,47 km/L"));
+        assertTrue(facts.contains("PRÓXIMO SERVIÇO"));
+        assertTrue(facts.contains("Troca de óleo e filtro"));
+        assertTrue(facts.contains("ÚLTIMO REGISTRO"));
+        View first = root.findViewWithTag(io.rea.obd.ui.JournalController.FIRST_ENTRY);
+        assertNotNull(first);
+        android.graphics.Rect visible = new android.graphics.Rect();
+        assertTrue(first.getGlobalVisibleRect(visible));
+        assertTrue("primeiro registro cortado", visible.height() == first.getHeight());
+        assertTrue(texts(first).contains("Abastecimento"));
+
+        View calculations = root.findViewWithTag("disclosure-Consumo, custos e lembretes");
+        assertNotNull(calculations);
+        android.view.ViewGroup parent = (android.view.ViewGroup) calculations.getParent();
+        View content = parent.getChildAt(parent.indexOfChild(calculations) + 1);
+        assertTrue(content.getVisibility() == View.GONE);
+        assertTrue(texts(content).contains("Total informado: R$ 746,40"));
+
+        first.performClick();
+        idle();
+        assertTrue(org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().isShowing());
+        controller.pause().stop().destroy();
+    }
+
+    @Test
+    public void liveSummarizesSixSensorsAndExpandsOneWithItsChart() throws Exception {
+        ActivityController<MainActivity> seed = Robolectric.buildActivity(MainActivity.class).setup();
+        seed.get().getPreferences(0).edit().putString("selected_pids", "12,13,5,4,17,15").commit();
+        seed.pause().stop().destroy();
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        activity.startDemo();
+        activity.navigate(NavigationState.LIVE);
+        waitForWorkers();
+        capture(activity, "18-ao-vivo-resumo");
+        View root = activity.getWindow().getDecorView();
+        assertNotNull(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.SUMMARY));
+        for (int pid : new int[]{12, 13, 5, 4, 17, 15}) {
+            View tile = root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + pid);
+            assertNotNull("sensor " + pid, tile);
+            android.graphics.Rect visible = new android.graphics.Rect();
+            assertTrue("sensor " + pid + " fora da tela", tile.getGlobalVisibleRect(visible));
+            assertTrue("sensor " + pid + " cortado", visible.height() == tile.getHeight());
+            assertFalse("sensor " + pid + " sem valor", texts(tile).startsWith(io.rea.obd.SensorCatalog.get(pid).name + "\n—"));
+        }
+        assertTrue(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 12).getContentDescription().toString().contains("Simulado"));
+        assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED)).contains("Simulado"));
+        assertTrue(texts(root).contains("DADOS SIMULADOS · nenhum veículo está sendo consultado"));
+        assertTrue(texts(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED)).startsWith("Rotação do motor"));
+
+        root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 13).performClick();
+        waitForWorkers();
+        root = activity.getWindow().getDecorView();
+        View expanded = root.findViewWithTag(io.rea.obd.ui.DashboardScreen.EXPANDED);
+        String details = texts(expanded);
+        assertTrue(details.startsWith("Velocidade"));
+        assertTrue(details.contains("km/h"));
+        assertTrue(details.contains("AMOSTRAS DA SESSÃO · DADOS SIMULADOS"));
+        assertTrue(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 13).isSelected());
+        assertFalse(root.findViewWithTag(io.rea.obd.ui.DashboardScreen.TILE + 12).isSelected());
+        io.rea.obd.ChartView chart = (io.rea.obd.ChartView) expanded.findViewWithTag("sensor-chart");
+        assertTrue(chart.pointCount() > 0);
+        assertTrue(chart.summary().endsWith("conectadas.") && chart.summary().contains("km/h"));
+        controller.pause().stop().destroy();
+    }
+
+    @Test
     public void deniedBluetoothPermissionExplainsInsteadOfListingDevices() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
@@ -117,9 +279,73 @@ public class ScreensTest {
     }
 
     @Test
-    public void populatedScreensRender() throws Exception {
+    @Config(qualifiers = "pt-rBR-w360dp-h640dp-xhdpi")
+    public void todayShowsTheThreeSummariesOnASmallScreen() throws Exception {
+        seedVehicleAndJournal();
+        ActivityController<MainActivity> reader = Robolectric.buildActivity(MainActivity.class).setup();
+        reader.get().startDemo();
+        reader.get().navigate(NavigationState.DIAGNOSIS);
+        reader.get().scan();
+        waitForWorkers();
+        reader.pause().stop().destroy();
+
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        waitForWorkers();
+        capture(activity, "14-hoje-360x640");
+        View root = activity.getWindow().getDecorView();
+        String text = texts(root);
+        assertTrue(text.contains("Conectar adaptador"));
+        assertTrue(text.contains("código"));
+        for (String tag : new String[]{io.rea.obd.ui.HomeScreen.SUMMARY_READING, io.rea.obd.ui.HomeScreen.SUMMARY_SERVICE, io.rea.obd.ui.HomeScreen.SUMMARY_FUEL}) {
+            View summary = root.findViewWithTag(tag);
+            assertNotNull(tag, summary);
+            android.graphics.Rect visible = new android.graphics.Rect();
+            assertTrue(tag + " fora da tela", summary.getGlobalVisibleRect(visible));
+            assertTrue(tag + " cortado", visible.height() == summary.getHeight() && visible.width() == summary.getWidth());
+        }
+        controller.pause().stop().destroy();
+    }
+
+    @Test
+    @Config(qualifiers = "pt-rBR-w360dp-h640dp-xhdpi")
+    public void todaySummariesWrapWithLargeFonts() throws Exception {
+        seedVehicleAndJournal();
+        org.robolectric.RuntimeEnvironment.setFontScale(1.5f);
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
+        MainActivity activity = controller.get();
+        waitForWorkers();
+        capture(activity, "15-hoje-fonte-grande");
+        View root = activity.getWindow().getDecorView();
+        for (String tag : new String[]{io.rea.obd.ui.HomeScreen.SUMMARY_READING, io.rea.obd.ui.HomeScreen.SUMMARY_SERVICE, io.rea.obd.ui.HomeScreen.SUMMARY_FUEL}) {
+            View summary = root.findViewWithTag(tag);
+            assertNotNull(tag, summary);
+            assertFits(tag, summary);
+        }
+        controller.pause().stop().destroy();
+        org.robolectric.RuntimeEnvironment.setFontScale(1.0f);
+    }
+
+    private static void assertFits(String tag, View view) {
+        if (view instanceof android.widget.TextView) {
+            android.widget.TextView text = (android.widget.TextView) view;
+            assertNotNull(tag, text.getLayout());
+            for (int line = 0; line < text.getLineCount(); line++) {
+                assertTrue(tag + " corta \"" + text.getText() + "\"", text.getLayout().getLineWidth(line) <= text.getWidth() - text.getTotalPaddingLeft() - text.getTotalPaddingRight() + 1);
+            }
+            assertTrue(tag + " sem altura para \"" + text.getText() + "\"", text.getHeight() >= text.getLayout().getHeight());
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                assertFits(tag, group.getChildAt(i));
+            }
+        }
+    }
+
+    static void seedVehicleAndJournal() throws Exception {
         android.content.Context context = org.robolectric.RuntimeEnvironment.getApplication();
-        long now = System.currentTimeMillis();
+        long now = io.rea.obd.ui.WallClock.millis();
         long day = 24L * 60 * 60 * 1000;
         io.rea.obd.vehicle.VehicleProfile cobalt = new io.rea.obd.vehicle.VehicleProfile("car-1", "Meu Cobalt",
                 "Chevrolet", "Cobalt", 2019, "BR", "LTZ", "1.8 L · 8V", "Flex", "Automático · 6 marchas", "");
@@ -138,10 +364,14 @@ public class ScreensTest {
         journal.save(new io.rea.obd.journal.JournalEntry("s1", "car-1", "Meu Cobalt", io.rea.obd.journal.JournalEntry.Kind.SERVICE, 1,
                 now - 30 * day, now - 30 * day, now - 30 * day, "Troca de óleo e filtro", km.subtract(new java.math.BigDecimal("1200")), null,
                 new java.math.BigDecimal("289.90"), null, false, false,
-                java.time.LocalDate.now().plusDays(45).toString(), new java.math.BigDecimal("56800")));
+                io.rea.obd.ui.WallClock.today().plusDays(45).toString(), new java.math.BigDecimal("56800")));
         journal.close();
-
         seed.pause().stop().destroy();
+    }
+
+    @Test
+    public void populatedScreensRender() throws Exception {
+        seedVehicleAndJournal();
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class).setup();
         MainActivity activity = controller.get();
         waitForWorkers();

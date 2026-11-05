@@ -113,4 +113,21 @@ public class MaintenanceRemindersTest {
         List<JournalEntry> entries = Arrays.asList(service("oil", T, "Troca de óleo", "2026-11-11", null), other);
         assertEquals(1, MaintenanceReminders.due(entries, TODAY).size());
     }
+
+    @Test public void overdueMileageTakesPriorityOverAnyFutureDate() {
+        List<JournalEntry> entries = Arrays.asList(
+            service("oil", T, "Óleo", "2027-05-10", null),
+            service("brakes", T + 1, "Freios", null, "50000"),
+            fuel("fill", T + 2, "51000"));
+        assertEquals("brakes", MaintenanceReminders.next(entries, "car", TODAY).id);
+        assertTrue(MaintenanceReminders.overdue(entries.get(1), TODAY, MaintenanceReminders.odometer(entries, "car")));
+    }
+
+    @Test public void soonMileageTakesPriorityOverADistantDate() {
+        List<JournalEntry> entries = Arrays.asList(
+            service("oil", T, "Óleo", "2027-05-10", null),
+            service("brakes", T + 1, "Freios", null, "50000"),
+            fuel("fill", T + 2, "49800"));
+        assertEquals("brakes", MaintenanceReminders.next(entries, "car", TODAY).id);
+    }
 }
