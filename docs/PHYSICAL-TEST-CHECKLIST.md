@@ -1,20 +1,20 @@
-# Roteiro de ensaio físico — ainda não executado nesta entrega
+# Physical test checklist — not yet run
 
-Não preencher a coluna Resultado com inferências dos testes simulados. Registre data, versão/commit, telefone/Android, adaptador e transporte, veículo/motor e responsável. Faça as operações de leitura com o veículo estacionado, em condição apropriada e com acompanhamento competente. Este protocolo não solicita apagar falhas.
+Do not fill the Result column with inferences from the simulated tests. Record the date, version/commit, phone/Android version, adapter and transport, vehicle/engine and the person responsible. Run the reading operations with the vehicle parked, in a suitable condition and with competent supervision. This protocol never asks to clear trouble codes.
 
-| Cenário | Evidência esperada | Resultado |
+| Scenario | Expected evidence | Result |
 |---|---|---|
-| Instalação da APK de teste | Pacote e versão; aplicativo real preservado | Pendente |
-| Permissão negada e concedida | Recuperação sem travar | Pendente |
-| Conexão ao adaptador | Transporte, respostas e tempos registrados | Pendente |
-| Leitura guiada | Estado por serviço; ausência distinta de falha | Pendente |
-| Perda e retorno da conexão | Dados antigos identificados; nova sessão sem mistura | Pendente |
-| Rotação, pausa e retorno | Estado coerente e gravação identificada | Pendente |
-| Conversa real com IA | Modelo, prévia, latência e referências; revisão humana | Pendente |
-| Sem internet/servidor | Mensagem recuperável e guia offline identificado | Pendente |
-| PDF no leitor do telefone | Paginação, acentos, banner de simulação | Pendente |
-| Backup via seletor Android | Arquivo salvo em destino privado | Pendente |
-| Restauração em instalação de teste | Mesmos perfis, leituras, casos e revisões do diário | Pendente |
-| Cancelar seletor e escolher arquivo inválido | Dados preservados | Pendente |
+| Install the debug APK | Package and version; the release app is preserved | Pending |
+| Permission denied, then granted | Recovers without freezing | Pending |
+| Connect to the adapter | Transport, replies and timings recorded | Pending |
+| Guided reading | State per service; missing data distinct from a fault | Pending |
+| Connection lost and restored | Old data identified; new session without mixing | Pending |
+| Rotation, pause and return | Consistent state and identified recording | Pending |
+| Real AI conversation (Gemini and Claude) | Key test, model, preview, latency and references; human review | Pending |
+| No internet or invalid key | Recoverable message and identified offline guide | Pending |
+| PDF in the phone's viewer | Pagination, accents, simulation band | Pending |
+| Backup through the Android picker | File saved to a private destination | Pending |
+| Restore on a test install | Same profiles, readings, cases and journal revisions | Pending |
+| Cancel the picker and choose an invalid file | Data preserved | Pending |
 
-Não publique VIN, placas, tokens, chaves ou dados pessoais nos logs do trabalho. Guarde somente a evidência necessária e revisada.
+Do not publish VINs, license plates, API keys or personal data in the project logs. Keep only the evidence that is needed and reviewed.

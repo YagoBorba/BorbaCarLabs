@@ -1,5 +1,7 @@
 # Validação da experiência acadêmica — 04/11/2026
 
+> Registro histórico. Esta validação foi feita quando a IA passava por um servidor Node.js local, removido depois em favor da chamada direta do app com a chave do usuário. Comandos `npm` e `server/` citados abaixo não existem mais; ver [TRABALHO-ACADEMICO.md](TRABALHO-ACADEMICO.md).
+
 Base: `develop` no commit `1e141bc`. Implementação na branch `codex/academic-ai-experience`; não é uma nova release publicada.
 
 ## Resultado executado
@@ -47,4 +49,4 @@ SHA-256 da APK desta validação:
 - Matriz de compatibilidade por combinação de hardware.
 - Hospedagem externa com HTTPS e autenticação por usuário.
 
-O protocolo de cinco chamadas reais e revisão humana está em [TRABALHO-ACADEMICO.md](TRABALHO-ACADEMICO.md); o roteiro de hardware está em [ENSAIO-FISICO.md](ENSAIO-FISICO.md). Nenhum resultado pendente foi contabilizado como aprovado.
+O protocolo de cinco chamadas reais e revisão humana está em [TRABALHO-ACADEMICO.md](TRABALHO-ACADEMICO.md); o roteiro de hardware está em [PHYSICAL-TEST-CHECKLIST.md](../PHYSICAL-TEST-CHECKLIST.md). Nenhum resultado pendente foi contabilizado como aprovado.
