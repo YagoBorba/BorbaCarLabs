@@ -77,15 +77,30 @@ public final class AnalysisClient {
     public static JSONObject analyze(AiSettings settings, String key, JSONObject request) throws IOException, JSONException {
         JSONObject kase = AiPrompt.caseFor(request);
         String model = settings.modelOrDefault();
-        try {
-            return ask(settings, key, model, kase);
-        } catch (Failure failure) {
-            // A busy default model should not end the conversation: try the provider's lighter model once.
-            if (!OVERLOADED.equals(failure.getMessage()) || !settings.model.isEmpty()) {
-                throw failure;
+        java.util.List<String> models = new java.util.ArrayList<>();
+        models.add(model);
+        if (settings.model.isEmpty()) {
+            for (String fallback : settings.provider.fallbackModels) {
+                if (!models.contains(fallback)) models.add(fallback);
             }
-            return ask(settings, key, settings.provider.fallbackModel, kase);
         }
+        IOException last = null;
+        for (String candidate : models) {
+            try {
+                return ask(settings, key, candidate, kase);
+            } catch (SocketTimeoutException slow) {
+                last = slow;
+            } catch (Failure failure) {
+                // A busy, slow or rate-limited model should not end the conversation; anything else
+                // (bad key, refusal, bad request) would fail the same way on every model.
+                if (!OVERLOADED.equals(failure.getMessage()) && !RATE_LIMITED.equals(failure.getMessage())
+                        && !TIMEOUT.equals(failure.getMessage())) {
+                    throw failure;
+                }
+                last = failure;
+            }
+        }
+        throw last;
     }
 
     private static JSONObject ask(AiSettings settings, String key, String model, JSONObject kase) throws IOException, JSONException {
@@ -182,6 +197,8 @@ public final class AnalysisClient {
 
     /** Free tiers often answer 500/503 for a moment; one quiet retry hides most of those blips. Tests set it to 0. */
     static int overloadRetries = 1;
+    /** A reply normally takes 2 to 10 s; past this the next model is usually faster than waiting. */
+    static int readTimeoutMs = 35_000;
 
     private static JSONObject exchange(String address, String method, Map<String, String> headers, JSONObject request) throws IOException, JSONException {
         for (int attempt = 0; ; attempt++) {
@@ -205,7 +222,7 @@ public final class AnalysisClient {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
         try {
             connection.setConnectTimeout(15_000);
-            connection.setReadTimeout(90_000);
+            connection.setReadTimeout(readTimeoutMs);
             connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod(method);
             connection.setDoOutput(request != null);

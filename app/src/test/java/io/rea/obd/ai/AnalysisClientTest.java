@@ -61,6 +61,7 @@ public class AnalysisClientTest {
     @After
     public void restoreRetries() {
         AnalysisClient.overloadRetries = 1;
+        AnalysisClient.readTimeoutMs = 35_000;
     }
 
     private String serve(int status, String body) throws IOException {
@@ -89,6 +90,19 @@ public class AnalysisClientTest {
     private final java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
 
     private void answer(ServerSocket socket, int status, String body) {
+            if (status == 0) { // a model that never answers in time: hold the connection open, keep accepting
+                try {
+                    Socket silent = socket.accept();
+                    requests.incrementAndGet();
+                    Thread hold = new Thread(() -> {
+                        try { Thread.sleep(2000); silent.close(); } catch (InterruptedException | IOException ignored) { }
+                    });
+                    hold.setDaemon(true);
+                    hold.start();
+                } catch (IOException ignored) {
+                }
+                return;
+            }
             try (Socket client = socket.accept()) {
                 requests.incrementAndGet();
                 // Content-Length counts bytes, so the body is read as bytes (accented text is longer in UTF-8).
@@ -138,7 +152,31 @@ public class AnalysisClientTest {
                 geminiReply(analysisJson("D1", "media"), "STOP")});
         AnalysisClient.analyze(settings(AiProvider.GEMINI, ""), KEY, request());
         assertEquals(2, requests.get());
-        assertTrue(requestLine.contains("/models/" + AiProvider.GEMINI.fallbackModel + ":generateContent"));
+        assertTrue(requestLine.contains("/models/" + AiProvider.GEMINI.fallbackModels[0] + ":generateContent"));
+    }
+
+    @Test
+    public void slowAndRateLimitedModelsHandOverToTheNextOne() throws Exception {
+        AnalysisClient.readTimeoutMs = 300;
+        String quota = "{\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\",\"message\":\"quota\"}}";
+        serve(new int[]{0, 429, 200}, new String[]{"", quota, geminiReply(analysisJson("D1", "media"), "STOP")});
+        JSONObject response = AnalysisClient.analyze(settings(AiProvider.GEMINI, ""), KEY, request());
+        assertEquals(3, requests.get());
+        assertTrue(requestLine.contains("/models/" + AiProvider.GEMINI.fallbackModels[1] + ":generateContent"));
+        assertEquals("gemini-test", response.getString("model"));
+    }
+
+    @Test
+    public void aModelChosenByTheUserIsNotSwapped() throws Exception {
+        serve(503, "{\"error\":{\"code\":503,\"status\":\"UNAVAILABLE\"}}");
+        AiSettings.save(RuntimeEnvironment.getApplication(), AiProvider.GEMINI, KEY, "gemini-3.5-flash", "");
+        try {
+            AnalysisClient.analyze(AiSettings.load(RuntimeEnvironment.getApplication(), AiProvider.GEMINI), KEY, request());
+            fail();
+        } catch (AnalysisClient.Failure expected) {
+            assertEquals(AnalysisClient.OVERLOADED, expected.getMessage());
+        }
+        assertEquals(1, requests.get());
     }
 
     /** Reads one CRLF-terminated header line; returns "" at the end of the headers or of the stream. */
@@ -270,8 +308,10 @@ public class AnalysisClientTest {
 
     @Test
     public void quotaModelAndOverloadErrorsAreExplained() throws IOException {
-        serve(429, "{\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\",\"message\":\"quota\"}}");
+        String quota = "{\"error\":{\"code\":429,\"status\":\"RESOURCE_EXHAUSTED\",\"message\":\"quota\"}}";
+        serve(new int[]{429, 429, 429}, new String[]{quota, quota, quota});
         assertEquals(AnalysisClient.RATE_LIMITED, failure(AiProvider.GEMINI));
+        assertEquals("every free model is tried before reporting the limit", 3, requests.get());
         stop();
         serve(404, "{\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: x\"}}");
         assertEquals(AnalysisClient.MODEL_UNAVAILABLE, failure(AiProvider.CLAUDE));
