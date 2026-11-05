@@ -6,9 +6,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.content.Context;
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -63,10 +63,11 @@ public class AnalysisClientTest {
         headers.clear();
         Thread thread = new Thread(() -> {
             try (Socket client = socket.accept()) {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
-                requestLine = reader.readLine();
+                // Content-Length counts bytes, so the body is read as bytes (accented text is longer in UTF-8).
+                InputStream input = client.getInputStream();
+                requestLine = readLine(input);
                 int length = 0;
-                for (String line = reader.readLine(); line != null && !line.isEmpty(); line = reader.readLine()) {
+                for (String line = readLine(input); !line.isEmpty(); line = readLine(input)) {
                     int colon = line.indexOf(':');
                     String name = line.substring(0, colon).trim().toLowerCase();
                     String value = line.substring(colon + 1).trim();
@@ -75,14 +76,14 @@ public class AnalysisClientTest {
                         length = Integer.parseInt(value);
                     }
                 }
-                char[] content = new char[length];
+                byte[] content = new byte[length];
                 int read = 0;
                 while (read < length) {
-                    int n = reader.read(content, read, length - read);
+                    int n = input.read(content, read, length - read);
                     if (n < 0) break;
                     read += n;
                 }
-                requestBody = new String(content, 0, read);
+                requestBody = new String(content, 0, read, StandardCharsets.UTF_8);
                 byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
                 OutputStream out = client.getOutputStream();
                 out.write(("HTTP/1.1 " + status + " X\r\nContent-Type: application/json\r\nContent-Length: " + bytes.length
@@ -98,6 +99,17 @@ public class AnalysisClientTest {
         AnalysisClient.geminiBase = base + "/v1beta";
         AnalysisClient.claudeBase = base + "/v1";
         return base;
+    }
+
+    /** Reads one CRLF-terminated header line; returns "" at the end of the headers or of the stream. */
+    private static String readLine(InputStream input) throws IOException {
+        ByteArrayOutputStream line = new ByteArrayOutputStream();
+        for (int b = input.read(); b != -1 && b != '\n'; b = input.read()) {
+            if (b != '\r') {
+                line.write(b);
+            }
+        }
+        return new String(line.toByteArray(), StandardCharsets.UTF_8);
     }
 
     private static Context context() {
