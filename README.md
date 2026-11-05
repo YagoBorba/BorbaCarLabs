@@ -17,6 +17,7 @@
 [![Project Type][type-shield]][type-link]
 [![Java][java-shield]][java-link]
 [![Android][android-shield]][android-link]
+[![License][license-shield]][license-link]
 
 </div>
 
@@ -30,6 +31,8 @@
 [java-link]: https://openjdk.org/
 [android-shield]: https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-3DDC84?style=flat-square&logo=android&logoColor=3DDC84&labelColor=black
 [android-link]: https://developer.android.com/
+[license-shield]: https://img.shields.io/badge/License-MIT-yellow?style=flat-square&labelColor=black
+[license-link]: LICENSE
 
 </br>
 
@@ -84,8 +87,8 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 - **Maintenance Reminders:**
     Daily notification when a service logged in the journal is within 7 days or 500 km of being due.
 
-- **AI Analysis (demo):**
-    Case-scoped conversations, suggested questions, reviewed sharing with the user’s preferred AI, and an optional Node.js server for Gemini or Claude. API credentials stay off the phone. The offline guide is labeled as rules, not AI.
+- **AI Analysis with your own key:**
+    Case-scoped conversations with Gemini or Claude, called directly from the phone with your own API key (encrypted with the Android Keystore). Suggested questions, a preview of exactly what is sent, replies that must cite the evidence they rely on, and sharing with any AI app instead. The offline guide is labeled as rules, not AI.
 
 - **Demo Mode:**
     Explore every screen without a car, with simulated data clearly marked.
@@ -100,10 +103,10 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 - **[SQLite](https://developer.android.com/training/data-storage/sqlite):** Local storage for diagnostic cases and the journal; external sharing and AI requests require an explicit user action.
 - **[PdfDocument](https://developer.android.com/reference/android/graphics/pdf/PdfDocument):** Paginated PDF reports with sections and a simulated-data banner.
 - **[JUnit 4](https://junit.org/junit4/) & [Robolectric](https://robolectric.org/):** JVM tests for the OBD stack and screen tests with the real `MainActivity`.
-- **[Node.js](https://nodejs.org/):** AI proxy server with the [Anthropic](https://docs.anthropic.com/) and [Google Gen AI](https://ai.google.dev/) SDKs.
+- **[Gemini API](https://ai.google.dev/gemini-api/docs) & [Claude API](https://platform.claude.com/docs):** Called over HTTPS with `HttpURLConnection` and structured JSON output; keys sealed with the [Android Keystore](https://developer.android.com/privacy-and-security/keystore).
 - **[GitHub Actions](https://github.com/features/actions) & [Dependabot](https://docs.github.com/en/code-security/dependabot):** Build, tests, lint, signed releases and dependency updates.
 
-**Development snapshot:** academic AI conversations and restorable backups are in development; the release badge refers to the last published version. Backups include garage, readings, case revisions and journal, with validation, undo and crash recovery. They exclude credentials, settings, CSV and AI conversations.
+**Development snapshot:** AI with your own key, academic AI conversations and restorable backups are in development; the release badge refers to the last published version. Backups include garage, readings, case revisions and journal, with validation, undo and crash recovery. They exclude credentials, settings, CSV and AI conversations.
 
 ## Architecture
 
@@ -118,7 +121,7 @@ flowchart LR
     K[DtcCatalog with sources + DtcStructure SAE J2012] --> DC
     DC --> H[DiagnosticCaseStore / HistoryStore SQLite]
     DC --> R[JSON, TXT and PDF reports]
-    DC --> AR[Minimized AnalysisRequest] -.HTTP.-> S[server/: Claude or Gemini]
+    DC --> AR[Minimized AnalysisRequest] -.HTTPS, user's key.-> S[Gemini or Claude API]
     S -.-> AV[Validated AnalysisResult]
 ```
 
@@ -131,7 +134,7 @@ The rules engine and the AI never touch the transport: they receive data, not co
 - **[JDK 17+](https://adoptium.net/)**
 - **[Android SDK](https://developer.android.com/studio)** with platform 35 (Android Studio or command line tools)
 - An ELM327 adapter to read a real car (optional: demo mode works without one)
-- **[Node.js 20+](https://nodejs.org/)** to run the AI server (optional)
+- A [Gemini](https://aistudio.google.com/apikey) or [Claude](https://platform.claude.com/settings/keys) API key to try the AI analysis (optional)
 
 ### 1. Clone the repository
 
@@ -149,7 +152,7 @@ cd BorbaCarLabs
 The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 > [!TIP]
-> The debug build uses the package `io.rea.obd.teste` and the name "BorbaCar Labs (teste)", so it installs next to the release app without touching its data and allows HTTP on the local network for the AI demo.
+> The debug build uses the package `io.rea.obd.teste` and the name "BorbaCar Labs (teste)", so it installs next to the release app without touching its data.
 
 ### 3. Run the tests
 
@@ -157,15 +160,19 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 ./gradlew testDebugUnitTest lintDebug
 ```
 
-### 4. Connect AI for the academic presentation (optional)
+### 4. Set up AI analysis (optional)
 
-On Windows, run `./start-ai.ps1` in the repository root. The first run offers a setup wizard for your provider API key, generates the app token, and starts the server. Paste the invitation shown in the terminal into **Settings → AI analysis → Server invitation**, then test the connection. Keep the invitation private.
+The app talks to the AI provider directly; no computer or server is involved.
 
-On other systems: `cd server`, `npm ci`, `npm run setup`, `npm start`. API access can consume credits or quotas; a personal chat subscription is separate from API access.
+1. Create an API key:
+   - **Gemini:** [Google AI Studio](https://aistudio.google.com/apikey). There is usually a free quota; on the free tier Google may use the submitted content to improve its products.
+   - **Claude:** [Claude Console](https://platform.claude.com/settings/keys). The API uses prepaid credits; a Claude app subscription is not an API key.
+2. In the app, open **Settings › AI analysis**, choose the provider, paste the key and tap **Save and test key**. The test checks the key and model without generating text, so it uses no credits.
+3. Choose **Talk to AI** from a reading or a saved investigation. Each question shows a preview of exactly what will be sent.
 
-Choose **Talk to AI** directly from a reading: the app saves or reuses its case. You can also open the assistant from a saved investigation. Each question has a review step. **Use my AI** shares a minimized prompt through Android without requiring a server. **Offline guide · no AI** works without a model.
+The key is encrypted with an Android Keystore key and only sent to the chosen provider. **Advanced** lets you change the model (defaults: `gemini-3.5-flash-lite` and `claude-sonnet-5-5`) and set a workspace ID for Claude keys without one. Usage may be billed to your provider account.
 
-See [the academic protocol and five-minute demo](docs/TRABALHO-ACADEMICO.md) and [server setup](server/README.md).
+Without a key, **Use my AI** shares the reviewed question with any AI app on the phone, and **Offline guide · no AI** works with no model at all.
 
 ### 5. Signed release
 
@@ -185,7 +192,7 @@ The CI pipeline runs on every pull request and on every push to `main` and `deve
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
 
-- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (data minimization, personal data filter and rejection of invented evidence).
+- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (data minimization, personal data filter, rejection of invented evidence, encrypted key storage and a local fake that answers like the Gemini and Claude APIs; no real provider is called).
 - **Screen tests:** Robolectric opens the real `MainActivity`, walks through every main screen and a scenario with a vehicle profile, journal and a demo reading, saving the screenshots in Portuguese; `EnglishScreensTest` does the same in English and fails if any text is left untranslated.
 - **Lint:** no errors; the report, test results, screenshots and APK are uploaded as workflow artifacts.
 
@@ -204,7 +211,7 @@ The signature is checked with `apksigner verify` before publishing. Running the 
 
 ```text
 app/src/main/java/io/rea/obd/
-    ai/             AI request, response contract and validation
+    ai/             AI request, prompt, provider client, key storage and validation
     application/    guided reading controller
     diagnostics/    cases, rules engine, demo scenarios and formatting
     history/        case store (SQLite), reading history and JSON codecs
@@ -218,9 +225,9 @@ app/src/main/java/io/rea/obd/
     ReportWriter.java, ReportLayout.java, ...
 
 app/src/test/       JVM and Robolectric tests
-server/             AI proxy server (Node.js)
 tools/              catalog generation from the official sources
-docs/               demo script, privacy notice, screenshots and project history
+docs/               privacy notice, physical test checklist, screenshots,
+                    academic material (pt-BR) and project history (pt-BR)
 ```
 
 ## Limitations
@@ -228,7 +235,7 @@ docs/               demo script, privacy notice, screenshots and project history
 - Generic OBD-II emissions diagnostics only; ABS, airbag and manufacturer-specific modules are not read.
 - Code meanings only for codes in the catalog; other codes show their system area with no presumed cause.
 - The AI suggests possibilities, not a diagnosis. Up to eight turns per case revision are stored separately on the device; replies never change diagnostic facts, rules or reports.
-- The AI server is meant for local network demos (HTTP, persistent daily quota for a single server process).
+- AI requests use the user's own key and quota; the app has no accounts, shared quota or billing of its own.
 - Not yet verified on a real car and adapter, or PDF rendering on a physical device.
 
 ## Documentation
@@ -236,15 +243,14 @@ docs/               demo script, privacy notice, screenshots and project history
 | Document | Content |
 |---|---|
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [Academic protocol](docs/TRABALHO-ACADEMICO.md) | AI setup, methodology, evaluation and presentation |
-| [Physical validation checklist](docs/ENSAIO-FISICO.md) | Pending real-device and adapter validation |
-| [docs/DEMONSTRACAO.md](docs/DEMONSTRACAO.md) | Demo script |
-| [docs/PRIVACIDADE.md](docs/PRIVACIDADE.md) | Privacy notice (LGPD) |
-| [docs/historico/](docs/historico/README.md) | Master plan, architecture, contracts, catalogs and validation of every version since 0.3.0 |
-| [server/README.md](server/README.md) | AI server |
+| [docs/PRIVACY.md](docs/PRIVACY.md) | Privacy notice (LGPD) |
+| [docs/PHYSICAL-TEST-CHECKLIST.md](docs/PHYSICAL-TEST-CHECKLIST.md) | Pending real-device and adapter validation |
 | [tools/README.md](tools/README.md) | Catalog generation from the sources |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](.github/SECURITY.md) | How to contribute and report vulnerabilities |
+| [docs/academic/](docs/academic/README.md) | Academic material in Brazilian Portuguese: research question, AI setup, presentation guide and evaluation |
+| [docs/historico/](docs/historico/README.md) | Project history in Brazilian Portuguese: master plan, architecture, contracts, catalogs and validation of every version since 0.3.0 |
 
-Project documents are written in Brazilian Portuguese.
+The code, the repository documents and the commit history are in English. The academic material and the project history are kept in Brazilian Portuguese, the language of the course this project was built for. The app itself is available in both languages.
 
 ## Contributing
 
@@ -257,7 +263,7 @@ This project follows **GitFlow** and **Conventional Commits**. Please read the [
 
 ## License
 
-No `LICENSE` file is currently present in this repository. All rights reserved until a license is chosen.
+Distributed under the [MIT License](LICENSE). The bundled vehicle and trouble code catalogs cite their public sources; see [tools/README.md](tools/README.md).
 
 ## Contact
 

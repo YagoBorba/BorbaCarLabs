@@ -45,7 +45,7 @@ git switch develop && git merge --no-ff main && git push
 
 - JDK 17 or newer
 - Android SDK with platform 35
-- Node.js 20+ (only for the AI server)
+- Node.js 20+ (only to regenerate the catalogs in `tools/`)
 
 ### Initial Setup
 
