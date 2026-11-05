@@ -55,11 +55,15 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 
 </div>
 
-<details><summary>Academic AI assistant (Robolectric screen)</summary>
+<div align="center">
 
-<img src="docs/screens/assistant-pt.png" width="320" alt="Case-scoped AI assistant in Portuguese" />
+| AI chat |
+|---|
+| <img src="docs/screens/ai-chat.png" width="320" alt="Chat with the AI about a demo reading" /> |
 
-</details>
+<sub>Simulated conversation about a demo reading, rendered by `AiAssistantScreenTest` without calling any provider. Portuguese version: [docs/telas/ia-conversa.png](docs/telas/ia-conversa.png).</sub>
+
+</div>
 
 ## What Can BorbaCar Labs Do?
 
