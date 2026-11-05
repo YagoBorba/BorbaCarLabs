@@ -54,7 +54,7 @@ public final class HomeScreen {
         summary.setPadding(uiKit.dp(16), uiKit.dp(10), uiKit.dp(16), uiKit.dp(8));
         reading(uiKit, summary, text, i, lastRead);
         if (journal) {
-            service(uiKit, summary, glance.reminder);
+            service(uiKit, summary, glance.reminder, glance.odometer);
             fuel(uiKit, summary, glance, official);
         }
         if (journal && !demo) {
@@ -128,7 +128,7 @@ public final class HomeScreen {
         }
     }
 
-    private static void service(UiKit ui, LinearLayout card, JournalEntry reminder) {
+    private static void service(UiKit ui, LinearLayout card, JournalEntry reminder, BigDecimal odometer) {
         LinearLayout item = item(ui, card, SUMMARY_SERVICE, "PRÓXIMO SERVIÇO");
         if (reminder == null) {
             tight(ui, ui.label(item, "—", 17, UiKit.TEXT, true));
@@ -136,6 +136,9 @@ public final class HomeScreen {
             return;
         }
         Due due = due(reminder);
+        if (io.rea.obd.journal.MaintenanceReminders.overdue(reminder, WallClock.today(), odometer) && !due.overdue) {
+            due = new Due(due.value, "Quilometragem atingida" + (due.detail.isEmpty() ? "" : " · " + due.detail), true);
+        }
         tight(ui, ui.label(item, due.value, 17, due.overdue ? UiKit.AMBER : UiKit.TEXT, true));
         if (!due.detail.isEmpty()) {
             tight(ui, ui.label(item, due.detail, 12, due.overdue ? UiKit.AMBER : UiKit.MUTED, false));

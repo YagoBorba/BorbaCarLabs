@@ -44,6 +44,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".backup.BackupActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <receiver
             android:name=".journal.ReminderReceiver"
             android:exported="false">

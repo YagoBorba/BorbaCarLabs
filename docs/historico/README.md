@@ -1,5 +1,10 @@
 # Histórico do projeto
 
+> **Project history (Brazilian Portuguese).** Planning, architecture, contracts, catalogs and validation
+> records written during versions 0.3.0 to 0.6.8. They are kept as an archive in their original language;
+> paths, counts and states in them refer to each document's version. For the current state, see the
+> [README](../../README.md) and the [CHANGELOG](../../CHANGELOG.md).
+
 Documentos escritos ao longo das versões 0.3.0 a 0.6.8, preservados como registro. Caminhos,
 contagens e estados citados neles valem para a versão de cada documento; o estado atual está no
 [README](../../README.md) e no [CHANGELOG](../../CHANGELOG.md).
