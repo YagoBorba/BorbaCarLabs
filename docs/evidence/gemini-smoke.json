@@ -1,0 +1,20 @@
+{
+  "http_status": 200,
+  "elapsed_ms": 10389,
+  "model": "gemini-3.5-flash-lite",
+  "summary": "Dados simulados: O código P0301 indica falha de ignição detectada no cilindro 1, mas não aponta a causa exata do problema. Permanece incerto se a falha decorre da vela, do cabo, da bobina, do bico injetor ou de problemas internos no motor.",
+  "evidence": [
+    [
+      "D1"
+    ],
+    [
+      "D1"
+    ],
+    [
+      "D1"
+    ]
+  ],
+  "error": null,
+  "synthetic_data": true,
+  "mechanical_accuracy": "not_evaluated"
+}

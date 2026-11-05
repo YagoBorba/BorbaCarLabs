@@ -285,6 +285,27 @@ public final class MainActivity extends Activity {
         this.ACCENT = themePalette.accent;
         this.AMBER = themePalette.attention;
         super.onCreate(bundle);
+        io.rea.obd.backup.BackupRepository recovery = new io.rea.obd.backup.BackupRepository(this, getPreferences(0));
+        if (recovery.hasPendingRestore()) {
+            recoveryBlocked = true;
+            android.widget.TextView warning = new android.widget.TextView(this);
+            warning.setPadding(32, 48, 32, 32);
+            warning.setText(I18n.english() ? "Recovering interrupted restore…" : "Recuperando restauração interrompida…");
+            setContentView(warning);
+            new Thread(() -> {
+                try {
+                    recovery.recoverInterruptedRestore();
+                    runOnUiThread(() -> { if (!isDestroyed()) recreate(); });
+                } catch (Exception failure) {
+                    runOnUiThread(() -> {
+                        if (!isDestroyed()) warning.setText(I18n.english()
+                            ? "Storage recovery could not finish. Free some space and restart. The recovery copy was preserved."
+                            : "A recuperação não pôde terminar. Libere espaço e reinicie. A cópia de recuperação foi preservada.");
+                    });
+                }
+            }, "backup-recovery").start();
+            return;
+        }
         themePalette.window(getWindow());
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(BluetoothManager.class);
         this.adapter = bluetoothManager == null ? null : bluetoothManager.getAdapter();
@@ -433,9 +454,12 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private boolean recoveryBlocked;
+
     @Override
     protected void onResume() {
         super.onResume();
+        if (recoveryBlocked) return;
         this.resumed = true;
         refreshValues();
         schedulePoll(200L);
@@ -444,6 +468,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (recoveryBlocked) { super.onPause(); return; }
         this.resumed = false;
         refreshValues();
         stopBleScan();
@@ -455,6 +480,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         this.destroyed = true;
+        if (aiAssistant != null) aiAssistant.close();
         JournalController journalController = this.journal;
         if (journalController != null) {
             journalController.close();
@@ -945,12 +971,17 @@ public final class MainActivity extends Activity {
     private void readingResult(DtcReadResult dtcReadResult) {
         LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
         boolean hasCodes = !dtcReadResult.observations().isEmpty();
+        if (this.currentDtcVehicle != null && dtcReadResult == this.currentDtcRead) {
+            button(verdict, "Conversar com a IA", true, this::talkAboutCurrentReading)
+                    .setEnabled(!this.busy && !this.caseBusy);
+        }
         if (hasCodes) {
-            button(verdict, "Entender esta leitura", true, () -> understandReading(dtcReadResult)).setTag("action-understand");
+            button(verdict, "Entender esta leitura", false, () -> understandReading(dtcReadResult)).setTag("action-understand");
             button(verdict, "Preparar resumo para oficina", false, () -> workshopSummary(dtcReadResult)).setTag("action-workshop");
         }
         if (this.currentDtcVehicle != null) {
-            button(verdict, "Investigar esta leitura", !hasCodes, () -> {
+            LinearLayout investigation = new UiKit(this).disclosure(verdict, I18n.english() ? "Add symptoms and investigate" : "Adicionar sintomas e investigar");
+            button(investigation, "Investigar esta leitura", false, () -> {
                 try {
                     editCase(capturedCase(), true);
                 } catch (Exception e) {
@@ -1326,6 +1357,13 @@ public final class MainActivity extends Activity {
         button(this.body, "Tema: " + text, false, () -> this.chooseAppearance());
         button(this.body, "Idioma: " + languageName(I18n.preference(this)), false, () -> this.chooseLanguage());
         kit.section(this.body, "Avançado", "");
+        button(this.body, I18n.english() ? "Backup and restore" : "Backup e restauração", false, () -> {
+            if (connected() || this.demo || this.busy || this.caseBusy || this.caseExportPreparing || (this.journal != null && !this.journal.canBackup())) {
+                message(I18n.english() ? "End the connection or demo and wait for pending saves before backing up." : "Encerre a conexão ou demonstração e aguarde os salvamentos antes do backup.");
+                return;
+            }
+            startActivity(new Intent(this, io.rea.obd.backup.BackupActivity.class));
+        });
         button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
         button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
         button(this.body, "Privacidade", false, () -> message("Privacidade",
@@ -2903,7 +2941,7 @@ public final class MainActivity extends Activity {
             button(linearLayout, "Exportar investigação JSON", false, () -> exportCase(document, false));
             button(linearLayout, "Exportar investigação TXT", false, () -> exportCase(document, "txt"));
             button(linearLayout, "Exportar investigação PDF", false, () -> exportCase(document, true));
-            button(linearLayout, "Análise por IA (demonstração)", false, () -> this.analyzeWithAi(diagnosticCase));
+            button(linearLayout, "Conversar com a IA", true, () -> this.analyzeWithAi(diagnosticCase));
             button(linearLayout, "Excluir esta investigação", false, () -> this.confirmCaseDeletion(diagnosticCase, alertDialogs));
             ScrollView scrollView = new ScrollView(this);
             scrollView.setBackgroundColor(this.CARD);
@@ -2925,97 +2963,49 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void analyzeWithAi(DiagnosticCase diagnosticCase) {
-        final AiSettings settings = AiSettings.load(this);
-        if (!settings.configured()) {
-            message("Análise por IA", "Configure o endereço e o token do servidor de IA em Ajustes › Análise por IA. A chave da Anthropic fica só no servidor, nunca no celular.");
-            return;
-        }
-        final AnalysisRequest request;
+    private io.rea.obd.ai.AiAssistant aiAssistant;
+
+    private void talkAboutCurrentReading() {
+        if (busy || caseBusy || currentDtcRead == null || currentDtcVehicle == null) return;
         try {
-            request = AnalysisRequest.from(diagnosticCase);
-        } catch (JSONException e) {
-            message(error(e));
-            return;
-        }
-        StringBuilder preview = new StringBuilder("Será enviado ao servidor de IA:\n");
-        JSONObject vehicle = request.body.optJSONObject("vehicle");
-        preview.append("• Veículo: ").append(vehicle == null || vehicle.length() == 0 ? "não informado" : String.join(" ", vehicleWords(vehicle))).append("\n");
-        for (String label : request.labels.values()) {
-            preview.append("• ").append(label).append("\n");
-        }
-        JSONObject symptoms = request.body.optJSONObject("symptoms");
-        if (symptoms != null) {
-            String[][] fields = {{"description", "Sintoma"}, {"when", "Quando"}, {"frequency", "Frequência"}, {"conditions", "Condições"}};
-            for (String[] field : fields) {
-                String text = symptoms.optString(field[0], "");
-                if (!text.isEmpty()) {
-                    preview.append("• ").append(field[1]).append(": \"").append(text).append("\"\n");
+            final DiagnosticCase candidate = capturedCase();
+            caseBusy = true;
+            caseWorker.execute(() -> {
+                try {
+                    DiagnosticCase saved = io.rea.obd.ai.AiCaseRepository.findOrSave(caseStore, candidate);
+                    List<JSONObject> documents = caseStore.latestAll();
+                    post(() -> {
+                        caseBusy = false;
+                        caseDocuments = documents;
+                        render();
+                        analyzeWithAi(saved);
+                    });
+                } catch (Exception e) {
+                    post(() -> { caseBusy = false; message(error(e)); });
                 }
-            }
-        }
-        preview.append("\n");
-        if (!request.removed.isEmpty()) {
-            preview.append("Removido do texto antes do envio: ").append(request.removed).append(".\n");
-        }
-        preview.append("Não são enviados: nome do perfil, VIN, notas, adaptador, identificadores ou horários. ")
-                .append("Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços não são detectados, então confira o texto acima. ")
-                .append("A resposta é gerada por IA e não substitui a avaliação de um profissional.");
-        new LocalizedDialog(this).setTitle("Enviar para análise por IA?").setMessage(preview.toString())
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Enviar", (dialog, which) -> {
-                    Notice.show(this, "Analisando com IA…");
-                    new Thread(() -> {
-                        try {
-                            AnalysisResult result = AnalysisResult.parse(AnalysisClient.analyze(settings.serverUrl, settings.token, request.body), request.refs());
-                            post(() -> message("Análise por IA · " + result.model, result.display(request.labels)
-                                    + "\n\nGerado por IA a partir dos dados enviados. São possibilidades, não um diagnóstico confirmado."));
-                        } catch (Exception e) {
-                            post(() -> message("Análise por IA", AnalysisClient.userMessage(e)));
-                        }
-                    }, "borbacar-ai").start();
-                }).show();
+            });
+        } catch (Exception e) { caseBusy = false; message(error(e)); }
     }
 
-    private static List<String> vehicleWords(JSONObject vehicle) {
-        List<String> words = new ArrayList<>();
-        for (String key : new String[]{"make", "model", "year", "engine", "fuel", "transmission"}) {
-            String id = vehicle.optString(key, "");
-            if (!id.isEmpty()) {
-                words.add(id);
-            }
+    private void analyzeWithAi(DiagnosticCase diagnosticCase) {
+        try {
+            if (aiAssistant != null) aiAssistant.close();
+            aiAssistant = new io.rea.obd.ai.AiAssistant(this, diagnosticCase);
+            aiAssistant.show();
+        } catch (Exception e) {
+            message(I18n.t("Não foi possível abrir o assistente: ") + error(e));
         }
-        return words;
     }
 
     private void configureAi() {
-        AiSettings current = AiSettings.load(this);
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(18.0f), dp(8.0f), dp(18.0f), dp(8.0f));
-        UiKit uiKit = new UiKit(this);
-        uiKit.label(form, "Para demonstrações. O celular fala só com o seu servidor (pasta server/ do projeto), que guarda a chave da Anthropic.", 13, this.MUTED, false);
-        final EditText url = uiKit.input(form, "Endereço do servidor", current.serverUrl, "ai-server-url");
-        url.setHint("http://192.168.0.10:8787");
-        url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        final EditText token = uiKit.input(form, "Token de acesso (BORBACAR_TOKEN)", current.token, "ai-token");
-        token.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        new LocalizedDialog(this).setTitle("Análise por IA").setView(form)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Salvar", (dialog, which) -> {
-                    if (AiSettings.save(this, url.getText().toString(), token.getText().toString())) {
-                        Notice.show(this, AiSettings.load(this).configured() ? "Servidor de IA configurado." : "Dados incompletos: use http(s)://… e um token com 16+ caracteres.");
-                        render();
-                    } else {
-                        message("Não foi possível salvar a configuração da IA.");
-                    }
-                }).show();
+        io.rea.obd.ai.AiSetupDialog.show(this);
     }
 
     void confirmCaseDeletion(final DiagnosticCase diagnosticCase, final AlertDialog[] alertDialogs) {
         new LocalizedDialog(this).setTitle("Excluir caso e todas as revisões?").setMessage("Somente esta investigação será removida. O relatório de leitura e os outros casos serão preservados.").setNegativeButton("Cancelar", null).setPositiveButton("Excluir", (dialog, which) -> this.caseWorker.execute(() -> {
             try {
                 this.caseStore.delete(diagnosticCase.id, diagnosticCase.vehicle.id);
+                io.rea.obd.ai.AiConversation.deleteCase(this, diagnosticCase.id);
                 final List<JSONObject> latestAll = this.caseStore.latestAll();
                 post(() -> {
                     alertDialogs[0].dismiss();

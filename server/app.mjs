@@ -40,6 +40,16 @@ export function acceptCase(body) {
     throw failure(400, "Caso fora do contrato");
   }
   const refs = new Set(body.observations.map((item) => item?.ref).filter((ref) => typeof ref === "string"));
+  if (refs.size !== body.observations.length || [...refs].some(ref => !/^[DMT]\d{1,3}$/.test(ref))) {
+    throw failure(400, "Referências de evidência inválidas ou duplicadas");
+  }
+  const question = body.question ?? "";
+  const conversation = body.conversation ?? [];
+  if (typeof question !== "string" || question.length > 500 || !Array.isArray(conversation) || conversation.length > 6
+      || conversation.some(turn => !turn || typeof turn.question !== "string" || turn.question.length > 500
+        || typeof turn.answer !== "string" || turn.answer.length > 2000)) {
+    throw failure(400, "Conversa fora do contrato");
+  }
   const kase = {
     vehicle: body.vehicle ?? {},
     read_complete: body.read_complete === true,
@@ -47,6 +57,8 @@ export function acceptCase(body) {
     observations: body.observations,
     symptoms: body.symptoms ?? {},
     language: body.language === "en" ? "en" : "pt-BR",
+    question,
+    conversation,
   };
   return { kase, refs };
 }
@@ -95,6 +107,10 @@ export function createApp({ token, provider, model, quota, analyze, maxBody = 16
     try {
       if (req.method === "GET" && req.url === "/health") {
         return send(res, 200, { ok: true, provider, model, remaining_today: quota.remaining() });
+      }
+      if (req.method === "GET" && req.url === "/v1/status") {
+        if (!authorized(req, token)) return send(res, 401, { error: "Token inválido" });
+        return send(res, 200, { ok: true, provider, model, remaining_today: quota.remaining(), conversation: true });
       }
       if (req.method !== "POST" || req.url !== "/v1/analyze") {
         return send(res, 404, { error: "Rota inexistente" });

@@ -1,89 +1,71 @@
 # Servidor de IA do BorbaCar Labs
 
-Servidor intermediário para a **análise por IA (demonstração)** das investigações. A chave da
-Anthropic fica só aqui; o celular conhece apenas o endereço deste servidor e um token próprio.
+Servidor opcional para conversar sobre uma captura OBD-II. A chave de API permanece no computador; o celular usa um convite de conexão. As respostas são hipóteses de apoio acadêmico, separadas dos fatos e relatórios.
 
-## O que ele faz
+## Começar
 
-1. Recebe do app um caso **com dados mínimos** (tipo do veículo, códigos, luz de injeção, leituras e
-   sintomas declarados, cada item com uma referência `D1`, `M1`, `T1`…). Nome do perfil, VIN,
-   notas, adaptador, identificadores e horários não saem do celular; telefones, e-mails, CPF, CNPJ e
-   placas são removidos dos sintomas, mas nomes e endereços escritos ali não são detectados.
-2. Pede ao Claude hipóteses em formato JSON fixo (structured outputs), com esforço `low` para
-   respostas curtas e baratas.
-3. Recusa respostas fora do contrato ou que citem referências que não foram enviadas. O app
-   confere tudo de novo antes de exibir.
+Requer Node.js 20+ e uma chave de API de Gemini ou Claude. Uma assinatura pessoal do aplicativo de chat não substitui acesso à API. Disponibilidade, preços e limites dependem do provedor e da conta; não há promessa de gratuidade.
 
-Limites: token obrigatório, caso de até 16 KB, `BORBACAR_DAILY_LIMIT` análises por dia (padrão 20).
-Cada análise reserva uma unidade **antes** de chamar o provedor, então pedidos simultâneos não
-ultrapassam o limite. Pedidos recusados antes da chamada, ou que falham sem resposta do provedor,
-devolvem a unidade. O consumo do dia fica em `server/usage.json` (ou em `BORBACAR_USAGE_FILE`),
-sobrevive a reinícios e zera à meia-noite no horário do servidor.
-Se o provedor não responder em `BORBACAR_TIMEOUT_MS` (padrão 60000), o app recebe 504.
-
-Testes: `npm test` sobe o servidor com um provedor falso, sem rede e sem chaves.
-
-## Como rodar (Node 20+)
-
-```bash
-cd server
-npm install
-```
-
-Defina as variáveis e inicie (PowerShell):
+No Windows, na raiz do repositório:
 
 ```powershell
-$env:ANTHROPIC_API_KEY = "sk-ant-..."     # ou faça `ant auth login` antes
-$env:BORBACAR_TOKEN = (node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
-$env:BORBACAR_TOKEN                        # copie para o app
+./start-ai.ps1
+```
+
+Em outros sistemas, nesta pasta:
+
+```sh
+npm ci
+npm run setup
 npm start
 ```
 
-No app de teste: **Ajustes › Análise por IA**, informe `http://IP-DO-PC:8787` (o IP do computador
-na mesma rede Wi-Fi, por exemplo pelo `ipconfig`) e o token. Depois abra uma investigação e toque
-em **Análise por IA (demonstração)**; o app mostra o que será enviado e pede confirmação.
+O assistente gera o token de acesso e salva a configuração em `.env`, ignorado pelo Git. Variáveis já presentes no ambiente têm precedência. Para reconfigurar no Windows, use `./start-ai.ps1 -Configure`.
 
-`GET /health` mostra o modelo em uso e quantas análises restam hoje.
+O terminal mostra um convite `http://IP:8787/#TOKEN`. No app de teste, abra **Ajustes → Análise por IA**, cole o convite e toque em **Salvar e testar conexão**. Computador e celular devem estar na mesma rede. O convite é uma credencial: não o publique em slides, mensagens públicas, capturas ou no Git.
 
-## Testar de graça com o Gemini (Google)
+O teste de conexão autentica o token e consulta o servidor, sem chamar o modelo. A chave do provedor é verificada na primeira análise. No app também há **Usar minha IA**, que compartilha o prompt revisado pelo seletor Android e dispensa este servidor.
 
-A API do Gemini tem um nível gratuito, sem cartão, bom para poucos testes. No nível gratuito o
-Google usa o conteúdo enviado para melhorar seus produtos; o app envia só dados mínimos,
-mas o texto livre dos sintomas pode conter dados pessoais que o filtro não reconhece; não envie o que você não queira compartilhar. Os limites por modelo aparecem no AI Studio.
+## Configuração manual
 
-1. Entre em **aistudio.google.com** com uma conta Google e clique em **Get API key** › **Create API key**.
-2. Salve a chave nas variáveis do seu usuário (PowerShell):
+| Variável | Uso |
+|---|---|
+| `BORBACAR_PROVIDER` | `gemini` ou `claude`; sem valor, usa Gemini quando sua chave está no ambiente |
+| `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | Chave do provedor selecionado |
+| `BORBACAR_TOKEN` | Token do app, com pelo menos 16 caracteres |
+| `BORBACAR_MODEL` | Substitui o modelo padrão do provedor |
+| `BORBACAR_DAILY_LIMIT` | Cota diária, padrão 20 |
+| `BORBACAR_USAGE_FILE` | Arquivo de consumo, padrão `usage.json` |
+| `BORBACAR_TIMEOUT_MS` | Tempo-limite, padrão 60000 |
+| `PORT` | Porta HTTP, padrão 8787 |
 
-   ```powershell
-   [Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "cole-a-chave-aqui", "User")
-   ```
+O modelo padrão Gemini é `gemini-3.5-flash-lite`; o padrão Claude é `claude-opus-5-5`. São configurações substituíveis, não uma garantia de disponibilidade permanente. O ensaio real desta entrega foi feito com Gemini, conforme a evidência versionada em `docs/evidence/`.
 
-3. Abra um novo PowerShell e inicie o servidor com o provedor Gemini:
+## Contrato
 
-   ```powershell
-   $env:BORBACAR_PROVIDER = "gemini"     # modelo padrão: gemini-3.5-flash-lite
-   $env:BORBACAR_TOKEN = "seu-token"
-   npm start
-   ```
+- `GET /health`: estado básico, modelo e cota; não chama o provedor.
+- `GET /v1/status`: teste autenticado do token e capacidade de conversa; não chama o provedor.
+- `POST /v1/analyze`: recebe `borbacar-ai-request-1`, uma captura minimizada, pergunta de até 500 caracteres e até seis pares de contexto. O app envia no máximo três resumos recentes.
 
-O app não muda: o mesmo token e endereço funcionam com qualquer provedor, e o contrato da resposta
-é o mesmo. O nome do modelo aparece no título da análise.
+As observações usam referências únicas `D1`, `M1`, `T1` etc. O servidor e o app recusam citações inexistentes e respostas fora do contrato. Isso não comprova sustentação mecânica: é necessária revisão humana. Perguntas e respostas anteriores são contexto, não novas medições. O modelo nunca recebe acesso a comandos do adaptador.
 
-## Modelo e custo
+O app filtra padrões de telefone, e-mail, CPF, CNPJ e placa; nomes, endereços e outros padrões podem permanecer. Cada envio tem prévia e confirmação. As políticas de tratamento e retenção do provedor também se aplicam.
 
-Padrão: `claude-opus-5-5` (US$ 4 / US$ 20 por milhão de tokens de entrada/saída), esforço `low`,
-com fallback automático do servidor da Anthropic em caso de recusa. Um caso típico usa ~1–2 mil
-tokens de entrada e ~1–2 mil de saída, ou seja, centavos de dólar por análise.
+## Testar e avaliar
 
-Para gastar ainda menos, troque o modelo por uma variável:
-
-```powershell
-$env:BORBACAR_MODEL = "claude-haiku-5-5"   # US$ 0,10 / US$ 0,50 por milhão
+```sh
+npm test
+npm run evaluate:fixtures
 ```
 
-## Limites desta versão
+Os testes usam provedor falso, sem chamadas cobradas. As cinco fixtures são sintéticas. Para avaliar respostas reais, inicie o servidor e execute em outro terminal:
 
-- Feito para demonstrações na rede local: HTTP simples (o build de teste permite) e contador
-  diário em memória. Para distribuir o app, use HTTPS e um servidor hospedado.
-- A análise não é salva na investigação e não altera regras, catálogo ou relatórios.
-- É uma interpretação gerada por IA, não diagnóstico confirmado.
+```sh
+npm run evaluate:live
+```
+
+Isso faz cinco chamadas reais e grava `evaluation-result.json`, excluído do Git, com modelo, latência e campos de revisão humana. HTTP 200 não significa diagnóstico correto. Consulte `docs/TRABALHO-ACADEMICO.md` na raiz do repositório para método, critérios e roteiro de apresentação.
+
+## Limites
+
+Este servidor é destinado à apresentação em rede local. HTTP deve ser usado somente na rede de demonstração, com a APK de teste; uma hospedagem externa exige HTTPS. A cota é persistida e reservada antes da chamada, para um único processo. Não há contas individuais, coordenação entre réplicas ou cobrança comercial. Perguntas podem consumir créditos mesmo se uma resposta for rejeitada ou a espera terminar após o envio ao provedor.
