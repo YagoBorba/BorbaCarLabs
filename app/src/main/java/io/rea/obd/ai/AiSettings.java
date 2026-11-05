@@ -71,6 +71,11 @@ public final class AiSettings {
         }
     }
 
+    /** Pasted keys often carry spaces, line breaks or quotes from the page they were copied from. */
+    static String cleanKey(String key) {
+        return key == null ? "" : key.replaceAll("\\s+", "").replaceAll("^[\"'`]+|[\"'`]+$", "");
+    }
+
     public static boolean validKey(String key) {
         return key != null && KEY.matcher(key).matches();
     }
@@ -88,7 +93,7 @@ public final class AiSettings {
      * an empty one keeps it. Throws IllegalArgumentException with a user-facing message.
      */
     public static void save(Context context, AiProvider provider, String key, String model, String workspace) {
-        String cleanKey = key == null ? "" : key.trim();
+        String cleanKey = cleanKey(key);
         String cleanModel = model == null ? "" : model.trim();
         String cleanWorkspace = workspace == null ? "" : workspace.trim();
         if (!cleanKey.isEmpty() && !validKey(cleanKey)) {

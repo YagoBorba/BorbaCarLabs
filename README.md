@@ -192,9 +192,11 @@ The CI pipeline runs on every pull request and on every push to `main` and `deve
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
 
-- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (data minimization, personal data filter, rejection of invented evidence, encrypted key storage and a local fake that answers like the Gemini and Claude APIs; no real provider is called).
+- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (data minimization, personal data filter, dropping of invented evidence, fallback to another model when one is busy, encrypted key storage and a local fake that answers like the Gemini and Claude APIs; no real provider is called).
 - **Screen tests:** Robolectric opens the real `MainActivity`, walks through every main screen and a scenario with a vehicle profile, journal and a demo reading, saving the screenshots in Portuguese; `EnglishScreensTest` does the same in English and fails if any text is left untranslated.
 - **Lint:** no errors; the report, test results, screenshots and APK are uploaded as workflow artifacts.
+
+Every merge into `develop` also publishes the newest signed APK on the [latest build](https://github.com/YagoBorba/BorbaCarLabs/releases/tag/latest-build) pre-release, always at the same address: <https://github.com/YagoBorba/BorbaCarLabs/releases/download/latest-build/BorbaCar-Labs.apk>. It uses the release key, so it installs over the previous build and over the numbered releases.
 
 Pushing a `v*` tag runs the release workflow, which tests, builds, signs and publishes the APK on the [Releases](https://github.com/YagoBorba/BorbaCarLabs/releases) page. Publishing requires these repository secrets; without any of them the workflow fails before creating the release:
 
