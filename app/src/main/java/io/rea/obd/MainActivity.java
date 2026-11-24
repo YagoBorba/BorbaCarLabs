@@ -37,10 +37,6 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import io.rea.obd.ai.AiSettings;
-import io.rea.obd.ai.AnalysisClient;
-import io.rea.obd.ai.AnalysisRequest;
-import io.rea.obd.ai.AnalysisResult;
 import io.rea.obd.application.GuidedReadController;
 import io.rea.obd.diagnostics.CaptureComparison;
 import io.rea.obd.diagnostics.DiagnosticCase;
@@ -480,7 +476,6 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         this.destroyed = true;
-        if (aiAssistant != null) aiAssistant.close();
         JournalController journalController = this.journal;
         if (journalController != null) {
             journalController.close();
@@ -971,12 +966,8 @@ public final class MainActivity extends Activity {
     private void readingResult(DtcReadResult dtcReadResult) {
         LinearLayout verdict = DiagnosisScreen.verdict(this.body, dtcReadResult, false);
         boolean hasCodes = !dtcReadResult.observations().isEmpty();
-        if (this.currentDtcVehicle != null && dtcReadResult == this.currentDtcRead) {
-            button(verdict, "Conversar com a IA", true, this::talkAboutCurrentReading)
-                    .setEnabled(!this.busy && !this.caseBusy);
-        }
         if (hasCodes) {
-            button(verdict, "Entender esta leitura", false, () -> understandReading(dtcReadResult)).setTag("action-understand");
+            button(verdict, "Entender esta leitura", true, () -> understandReading(dtcReadResult)).setTag("action-understand");
             button(verdict, "Preparar resumo para oficina", false, () -> workshopSummary(dtcReadResult)).setTag("action-workshop");
         }
         if (this.currentDtcVehicle != null) {
@@ -1364,13 +1355,9 @@ public final class MainActivity extends Activity {
             }
             startActivity(new Intent(this, io.rea.obd.backup.BackupActivity.class));
         });
-        button(this.body, AiSettings.load(this).configured() ? "Análise por IA: configurada" : "Análise por IA: configurar", false, () -> this.configureAi());
         button(this.body, "Identificação automática", false, () -> this.showAutomaticIdentity());
         button(this.body, "Privacidade", false, () -> message("Privacidade",
                 "Tudo o que o app guarda (veículos, leituras, investigações, Diário e preferências) fica só neste celular, sem conta e sem nuvem.\n\n"
-                        + "Só sai do aparelho quando você pede uma Análise por IA e confirma a prévia: tipo do veículo, códigos, leituras e sintomas vão direto ao provedor que você escolheu (Gemini ou Claude), com a sua chave de API. "
-                        + "Nome do perfil, VIN, anotações, adaptador, identificadores e horários não são enviados. "
-                        + "Telefones, e-mails, CPF, CNPJ e placas escritos nos sintomas são removidos; nomes e endereços digitados ali não são detectados.\n\n"
                         + "Relatórios só saem quando você escolhe onde salvar ou compartilhar. Para apagar tudo: Configurações do Android › Apps › BorbaCar Labs › Limpar dados."));
         button(this.body, Motion.reduced(this) ? "Animações: reduzidas" : "Animações: suaves", false, () -> {
             if (Motion.saveReduced(this, !Motion.reduced(this))) {
@@ -2941,7 +2928,6 @@ public final class MainActivity extends Activity {
             button(linearLayout, "Exportar investigação JSON", false, () -> exportCase(document, false));
             button(linearLayout, "Exportar investigação TXT", false, () -> exportCase(document, "txt"));
             button(linearLayout, "Exportar investigação PDF", false, () -> exportCase(document, true));
-            button(linearLayout, "Conversar com a IA", true, () -> this.analyzeWithAi(diagnosticCase));
             button(linearLayout, "Excluir esta investigação", false, () -> this.confirmCaseDeletion(diagnosticCase, alertDialogs));
             ScrollView scrollView = new ScrollView(this);
             scrollView.setBackgroundColor(this.CARD);
@@ -2963,49 +2949,10 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private io.rea.obd.ai.AiAssistant aiAssistant;
-
-    private void talkAboutCurrentReading() {
-        if (busy || caseBusy || currentDtcRead == null || currentDtcVehicle == null) return;
-        try {
-            final DiagnosticCase candidate = capturedCase();
-            caseBusy = true;
-            caseWorker.execute(() -> {
-                try {
-                    DiagnosticCase saved = io.rea.obd.ai.AiCaseRepository.findOrSave(caseStore, candidate);
-                    List<JSONObject> documents = caseStore.latestAll();
-                    post(() -> {
-                        caseBusy = false;
-                        caseDocuments = documents;
-                        render();
-                        analyzeWithAi(saved);
-                    });
-                } catch (Exception e) {
-                    post(() -> { caseBusy = false; message(error(e)); });
-                }
-            });
-        } catch (Exception e) { caseBusy = false; message(error(e)); }
-    }
-
-    private void analyzeWithAi(DiagnosticCase diagnosticCase) {
-        try {
-            if (aiAssistant != null) aiAssistant.close();
-            aiAssistant = new io.rea.obd.ai.AiAssistant(this, diagnosticCase);
-            aiAssistant.show();
-        } catch (Exception e) {
-            message(I18n.t("Não foi possível abrir o assistente: ") + error(e));
-        }
-    }
-
-    private void configureAi() {
-        io.rea.obd.ai.AiSetupDialog.show(this);
-    }
-
     void confirmCaseDeletion(final DiagnosticCase diagnosticCase, final AlertDialog[] alertDialogs) {
         new LocalizedDialog(this).setTitle("Excluir caso e todas as revisões?").setMessage("Somente esta investigação será removida. O relatório de leitura e os outros casos serão preservados.").setNegativeButton("Cancelar", null).setPositiveButton("Excluir", (dialog, which) -> this.caseWorker.execute(() -> {
             try {
                 this.caseStore.delete(diagnosticCase.id, diagnosticCase.vehicle.id);
-                io.rea.obd.ai.AiConversation.deleteCase(this, diagnosticCase.id);
                 final List<JSONObject> latestAll = this.caseStore.latestAll();
                 post(() -> {
                     alertDialogs[0].dismiss();
