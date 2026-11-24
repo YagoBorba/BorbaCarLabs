@@ -17,7 +17,6 @@ import android.graphics.Insets;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -54,7 +53,6 @@ import io.github.yagoborba.borbacar.history.DiagnosticCaseStore;
 import io.github.yagoborba.borbacar.history.DiagnosticHistoryStore;
 import io.github.yagoborba.borbacar.history.DtcReadJson;
 import io.github.yagoborba.borbacar.journal.ReminderReceiver;
-import io.github.yagoborba.borbacar.knowledge.DtcCatalog;
 import io.github.yagoborba.borbacar.knowledge.DtcDefinition;
 import io.github.yagoborba.borbacar.knowledge.DtcReference;
 import io.github.yagoborba.borbacar.knowledge.DtcStructure;
@@ -88,10 +86,8 @@ import io.github.yagoborba.borbacar.vehicle.catalog.VehicleCatalogStore;
 import io.github.yagoborba.borbacar.vehicle.catalog.VehicleEfficiency;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -113,9 +109,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -131,8 +125,6 @@ public final class MainActivity extends Activity {
     private ScanCallback bleCallback;
     private BluetoothLeScanner bleScanner;
     private LinearLayout body;
-    private boolean caseBusy;
-    private boolean caseExportPreparing;
     private DiagnosticCaseStore caseStore;
     private ChartView chart;
     private volatile ElmSession connection;
@@ -147,7 +139,7 @@ public final class MainActivity extends Activity {
     private JournalController journal;
     private File lastCsv;
     private LinearLayout nav;
-    private File pendingCaseExport;
+    private InvestigationController investigations;
     private File pendingPdf;
     private TelemetryRecorder recorder;
     private String[] pendingAdapter;
@@ -212,8 +204,6 @@ public final class MainActivity extends Activity {
     private final Map<Integer, DiagnosticCase.Sample> contextualSamples = new HashMap();
     private List<DiagnosticCase.Sample> currentCaseSamples = Collections.emptyList();
     private final ExecutorService caseWorker = CASE_IO;
-    private List<JSONObject> caseDocuments = Collections.emptyList();
-    private String caseWarning = "";
     private final SparseIntArray scrollPositions = new SparseIntArray();
     private String historySessionId = "";
     private String recordingAcquisitionId = "";
@@ -331,7 +321,8 @@ public final class MainActivity extends Activity {
             this.storageWarning += " Histórico indisponível: " + error(exc) + ". Os dados originais foram preservados.";
         }
         this.caseStore = new DiagnosticCaseStore(this);
-        refreshCases();
+        this.investigations = new InvestigationController(this, investigationHost(), this.caseStore, this.caseWorker, this.clock);
+        this.investigations.refresh();
         String string = getPreferences(0).getString("selected_pids", "");
         if (!string.isEmpty()) {
             LinkedHashSet seen = new LinkedHashSet();
@@ -363,16 +354,7 @@ public final class MainActivity extends Activity {
         if (bundle != null) {
             this.historyLimit = Math.max(8, Math.min(10000, bundle.getInt("history_limit", 8)));
             this.page = NavigationState.restore(bundle.getInt("page", 4));
-            String caseExport = bundle.getString("case_export", "");
-            if (!caseExport.isEmpty()) {
-                try {
-                    File file2 = new File(caseExport);
-                    if (file2.getCanonicalFile().getParentFile().equals(getCacheDir().getCanonicalFile()) && file2.getName().startsWith("investigacao-") && file2.isFile()) {
-                        this.pendingCaseExport = file2;
-                    }
-                } catch (IOException unused4) {
-                }
-            }
+            this.investigations.restorePendingExport(bundle.getString("case_export", ""));
         }
         this.historySection = bundle != null ? Math.max(0, Math.min(1, bundle.getInt("history_section"))) : 0;
         this.journal = new JournalController(this, new JournalController.Host() {
@@ -444,7 +426,7 @@ public final class MainActivity extends Activity {
                 message("Não foi possível preservar o rascunho: " + error(exc));
             }
         }
-        File file = this.pendingCaseExport;
+        File file = this.investigations == null ? null : this.investigations.pendingExport();
         if (file != null) {
             bundle.putString("case_export", file.getAbsolutePath());
         }
@@ -580,6 +562,71 @@ public final class MainActivity extends Activity {
 
     private LinearLayout card(LinearLayout linearLayout) {
         return new UiKit(this).card(linearLayout, false);
+    }
+
+    private InvestigationController.Host investigationHost() {
+        return new InvestigationController.Host() {
+            @Override
+            public void render() {
+                MainActivity.this.render();
+            }
+
+            @Override
+            public void message(String text) {
+                MainActivity.this.message(text);
+            }
+
+            @Override
+            public String error(Exception e) {
+                return MainActivity.this.error(e);
+            }
+
+            @Override
+            public void post(Runnable action) {
+                MainActivity.this.post(action);
+            }
+
+            @Override
+            public VehicleProfile activeVehicle() {
+                return MainActivity.this.activeVehicle();
+            }
+
+            @Override
+            public Set<String> profileIds() {
+                Set<String> ids = new HashSet<>();
+                if (MainActivity.this.vehicles != null) {
+                    for (VehicleProfile profile : MainActivity.this.vehicles.all()) {
+                        ids.add(profile.id);
+                    }
+                }
+                return ids;
+            }
+
+            @Override
+            public TextView label(LinearLayout parent, String text, int size, int color, boolean medium) {
+                return MainActivity.this.label(parent, text, size, color, medium);
+            }
+
+            @Override
+            public Button button(LinearLayout parent, String text, boolean primary, Runnable action) {
+                return MainActivity.this.button(parent, text, primary, action);
+            }
+
+            @Override
+            public void gap(LinearLayout parent, int height) {
+                MainActivity.this.gap(parent, height);
+            }
+
+            @Override
+            public LinearLayout card(LinearLayout parent) {
+                return MainActivity.this.card(parent);
+            }
+
+            @Override
+            public int dp(float value) {
+                return MainActivity.this.dp(value);
+            }
+        };
     }
 
     private void heading(String category, String text, String name) {
@@ -788,7 +835,7 @@ public final class MainActivity extends Activity {
     private void home() {
         String string;
         VehicleProfile activeVehicle = activeVehicle();
-        Iterator<JSONObject> it = this.caseDocuments.iterator();
+        Iterator<JSONObject> it = this.investigations.documents().iterator();
         int i = 0;
         while (it.hasNext()) {
             JSONObject input = it.next().optJSONObject("input");
@@ -844,10 +891,10 @@ public final class MainActivity extends Activity {
                 }
             }
         });
-        if (this.caseWarning.isEmpty()) {
+        if (this.investigations.warning().isEmpty()) {
             return;
         }
-        label(this.body, this.caseWarning, 13, this.AMBER, false);
+        label(this.body, this.investigations.warning(), 13, this.AMBER, false);
     }
 
     private DashboardState dashboardState() {
@@ -954,7 +1001,7 @@ public final class MainActivity extends Activity {
             button(feature, "Explorar demonstração", false, () -> this.startDemo()).setEnabled(!this.busy);
         }
         if (this.demo || connected()) {
-            button(feature, "Iniciar leitura guiada", true, () -> this.confirmGuidedRead()).setEnabled((this.busy || this.caseBusy) ? false : true);
+            button(feature, "Iniciar leitura guiada", true, () -> this.confirmGuidedRead()).setEnabled((this.busy || this.investigations.busy()) ? false : true);
             button(feature, this.busy ? "Leitura em andamento…" : "Ler só os códigos de falha", false, () -> this.scan()).setEnabled(!this.busy);
             label(feature, "A leitura guiada também coleta a prontidão dos monitores e o quadro congelado.", 12, this.MUTED, false);
         }
@@ -974,11 +1021,11 @@ public final class MainActivity extends Activity {
             LinearLayout investigation = new UiKit(this).disclosure(verdict, I18n.english() ? "Add symptoms and investigate" : "Adicionar sintomas e investigar");
             button(investigation, "Investigar esta leitura", false, () -> {
                 try {
-                    editCase(capturedCase(), true);
+                    this.investigations.edit(capturedCase(), true);
                 } catch (Exception e) {
                     message(error(e));
                 }
-            }).setEnabled((this.caseBusy || this.busy) ? false : true);
+            }).setEnabled((this.investigations.busy() || this.busy) ? false : true);
         }
         for (final DtcObservation dtcObservation : dtcReadResult.observations()) {
             LinearLayout card = card(this.body);
@@ -1054,7 +1101,7 @@ public final class MainActivity extends Activity {
         }
         if (this.currentDtcRead != null && this.currentDtcVehicle != null) {
             label(disclosure, "Opcional: colete prontidão e quadro antes de criar a investigação.", 12, this.MUTED, false);
-            button(disclosure, "Ler dados complementares", false, () -> this.readSupplement()).setEnabled((this.busy || this.caseBusy || !sameAcquisition()) ? false : true);
+            button(disclosure, "Ler dados complementares", false, () -> this.readSupplement()).setEnabled((this.busy || this.investigations.busy() || !sameAcquisition()) ? false : true);
         }
         LinearLayout disclosure2 = uiKit.disclosure(this.body, "Ferramentas do scanner");
         label(disclosure2, "ABS, airbags e módulos específicos não têm cobertura comprovada nesta versão.", 13, this.MUTED, false);
@@ -1070,7 +1117,7 @@ public final class MainActivity extends Activity {
         heading("ACOMPANHAMENTO", "Histórico", activeVehicle() == null ? "Escolha um veículo na Garagem." : activeVehicle().name);
         historyTabs(this.historySection);
         if (this.historySection == 1) {
-            investigationList();
+            this.investigations.list(this.body);
             return;
         }
         UiKit uiKit = new UiKit(this);
@@ -1110,19 +1157,19 @@ public final class MainActivity extends Activity {
                     label(card, ReportText.plurals(json.optString("summary")), 13, this.TEXT, false);
                 }
                 if (json.has("investigation_seed")) {
-                    button(card, "Investigar leitura de " + json.optString("date"), false, () -> this.openInvestigationFromReport(json)).setEnabled(!this.caseBusy);
+                    button(card, "Investigar leitura de " + json.optString("date"), false, () -> this.openInvestigationFromReport(json)).setEnabled(!this.investigations.busy());
                 }
                 JSONObject dtcRead = json.optJSONObject("dtc_read");
                 final ArrayList items = new ArrayList();
                 if (dtcRead != null) {
-                    for (JSONObject caseDocument : this.caseDocuments) {
+                    for (JSONObject caseDocument : this.investigations.documents()) {
                         if (dtcRead.optString("capture_id").equals(caseDocument.optJSONObject("input").optJSONObject("dtc_read").optString("capture_id"))) {
                             items.add(caseDocument);
                         }
                     }
                 }
                 if (!items.isEmpty()) {
-                    button(card, "Investigações desta leitura (" + items.size() + ")", false, () -> chooseCaseDocuments("Investigações vinculadas à captura", items));
+                    button(card, "Investigações desta leitura (" + items.size() + ")", false, () -> this.investigations.choose("Investigações vinculadas à captura", items));
                 }
                 gap(card, 14);
             }
@@ -1143,7 +1190,7 @@ public final class MainActivity extends Activity {
     void openInvestigationFromReport(JSONObject json) {
         try {
             DiagnosticCase diagnosticCase = DiagnosticCaseJson.decode(json.getJSONObject("investigation_seed"));
-            editCase(diagnosticCase.vehicleRecord == null ? DiagnosticCaseBuilder.create(diagnosticCase.vehicle, diagnosticCase.adapter, diagnosticCase.dtc, diagnosticCase.telemetry, diagnosticCase.symptoms, this.clock.epochMillis(), diagnosticCase.supplement) : DiagnosticCaseBuilder.createWithProfile(diagnosticCase.vehicleRecord, diagnosticCase.adapter, diagnosticCase.dtc, diagnosticCase.telemetry, diagnosticCase.symptoms, this.clock.epochMillis(), diagnosticCase.supplement), true);
+            this.investigations.edit(diagnosticCase.vehicleRecord == null ? DiagnosticCaseBuilder.create(diagnosticCase.vehicle, diagnosticCase.adapter, diagnosticCase.dtc, diagnosticCase.telemetry, diagnosticCase.symptoms, this.clock.epochMillis(), diagnosticCase.supplement) : DiagnosticCaseBuilder.createWithProfile(diagnosticCase.vehicleRecord, diagnosticCase.adapter, diagnosticCase.dtc, diagnosticCase.telemetry, diagnosticCase.symptoms, this.clock.epochMillis(), diagnosticCase.supplement), true);
         } catch (Exception e) {
             message(error(e));
         }
@@ -1349,7 +1396,7 @@ public final class MainActivity extends Activity {
         button(this.body, "Idioma: " + languageName(I18n.preference(this)), false, () -> this.chooseLanguage());
         kit.section(this.body, "Avançado", "");
         button(this.body, I18n.english() ? "Backup and restore" : "Backup e restauração", false, () -> {
-            if (connected() || this.demo || this.busy || this.caseBusy || this.caseExportPreparing || (this.journal != null && !this.journal.canBackup())) {
+            if (connected() || this.demo || this.busy || this.investigations.busy() || this.investigations.exporting() || (this.journal != null && !this.journal.canBackup())) {
                 message(I18n.english() ? "End the connection or demo and wait for pending saves before backing up." : "Encerre a conexão ou demonstração e aguarde os salvamentos antes do backup.");
                 return;
             }
@@ -2107,7 +2154,7 @@ public final class MainActivity extends Activity {
     }
 
     public void confirmGuidedRead() {
-        if (this.busy || this.caseBusy) {
+        if (this.busy || this.investigations.busy()) {
             return;
         }
         if (this.demo || connected()) {
@@ -2124,7 +2171,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startGuidedRead() {
-        if (this.busy || this.caseBusy) {
+        if (this.busy || this.investigations.busy()) {
             return;
         }
         if ((!this.demo && !connected()) || activeVehicle() == null || this.acquisitionSessionId == null) {
@@ -2276,7 +2323,7 @@ public final class MainActivity extends Activity {
     }
 
     public void readSupplement() {
-        if (this.busy || this.caseBusy || !sameAcquisition()) {
+        if (this.busy || this.investigations.busy() || !sameAcquisition()) {
             return;
         }
         final DtcReadResult dtcReadResult = this.currentDtcRead;
@@ -2593,20 +2640,9 @@ public final class MainActivity extends Activity {
             }
             return;
         }
-        if (i == 502) {
-            final File file = this.pendingCaseExport;
-            this.pendingCaseExport = null;
-            if (file == null) {
-                return;
-            }
-            if (value != -1 || intent == null || intent.getData() == null) {
-                file.delete();
-                return;
-            } else {
-                final Uri data = intent.getData();
-                this.caseWorker.execute(() -> this.writePendingExport(file, data));
-                return;
-            }
+        if (i == InvestigationController.EXPORT_REQUEST) {
+            this.investigations.exportResult(value, intent);
+            return;
         }
         if ((i != 500 && i != 501) || value != -1 || intent == null || intent.getData() == null) {
             return;
@@ -2666,58 +2702,6 @@ public final class MainActivity extends Activity {
         }
     }
 
-    void writePendingExport(File file, Uri uri) {
-        try {
-            try {
-                FileInputStream fileInputStream = new FileInputStream(file);
-                try {
-                    OutputStream outputStream = getContentResolver().openOutputStream(uri);
-                    try {
-                        if (outputStream == null) {
-                            throw new IOException("Destino indisponível");
-                        }
-                        byte[] bytes = new byte[8192];
-                        while (true) {
-                            int i = fileInputStream.read(bytes);
-                            if (i == -1) {
-                                break;
-                            } else {
-                                outputStream.write(bytes, 0, i);
-                            }
-                        }
-                        post(() -> Notice.show(this, "Investigação exportada."));
-                        if (outputStream != null) {
-                            outputStream.close();
-                        }
-                        fileInputStream.close();
-                        file.delete();
-                    } catch (Throwable throwable) {
-                        if (outputStream != null) {
-                            try {
-                                outputStream.close();
-                            } catch (Throwable throwable2) {
-                                throwable.addSuppressed(throwable2);
-                            }
-                        }
-                        throw throwable;
-                    }
-                } catch (Throwable throwable) {
-                    try {
-                        fileInputStream.close();
-                    } catch (Throwable throwable3) {
-                        throwable.addSuppressed(throwable3);
-                    }
-                    throw throwable;
-                }
-            } catch (Exception e) {
-                post(() -> message("Falha ao exportar: " + error(e)));
-            }
-        } catch (Throwable throwable) {
-            file.delete();
-            throw throwable;
-        }
-    }
-
     private void record(DtcReadResult dtcReadResult, VehicleProfile vehicleProfile) {
         String vehicleNameSnapshot;
         if (this.historyStore == null) {
@@ -2746,293 +2730,6 @@ public final class MainActivity extends Activity {
 
     public void shareHistory() {
         shareReports(this.history);
-    }
-
-    private void refreshCases() {
-        this.caseWorker.execute(() -> {
-            try {
-                final List<JSONObject> latestAll = this.caseStore.latestAll();
-                post(() -> {
-                    this.caseDocuments = latestAll;
-                    this.caseWarning = "";
-                    render();
-                });
-            } catch (Exception e) {
-                post(() -> {
-                    this.caseWarning = "Investigações indisponíveis: " + error(e) + ". Os registros originais foram preservados.";
-                    render();
-                });
-            }
-        });
-    }
-
-    private void investigationList() {
-        LinearLayout card = card(this.body);
-        label(card, "INVESTIGAÇÕES OFFLINE", 11, this.ACCENT, true);
-        gap(card, 8);
-        label(card, "Guarde sintomas junto da leitura, revise e reabra sem internet. A revisão organiza evidências; ainda não propõe causas mecânicas.", 13, this.MUTED, false);
-        if (!this.caseWarning.isEmpty()) {
-            label(card, this.caseWarning, 13, this.AMBER, false);
-        }
-        if (this.caseBusy) {
-            label(card, "Salvando investigação…", 13, this.AMBER, false);
-        }
-        VehicleProfile activeVehicle = activeVehicle();
-        final HashSet seen = new HashSet();
-        VehicleRepository vehicleRepository = this.vehicles;
-        if (vehicleRepository != null) {
-            Iterator<VehicleProfile> it = vehicleRepository.all().iterator();
-            while (it.hasNext()) {
-                seen.add(it.next().id);
-            }
-        }
-        int i = 0;
-        int value = 0;
-        for (final JSONObject caseDocument : this.caseDocuments) {
-            JSONObject input = caseDocument.optJSONObject("input");
-            if (input != null) {
-                String id = input.optJSONObject("vehicle").optString("id");
-                if (!seen.contains(id)) {
-                    value++;
-                }
-                if (activeVehicle != null && activeVehicle.id.equals(id)) {
-                    int value2 = i + 1;
-                    label(card, "Revisado " + Format.when(input.optLong("revised_at_ms")) + " · " + input.optJSONObject("symptoms").optString("description", ""), 12, this.MUTED, false);
-                    StringBuilder builder = new StringBuilder("Caso ");
-                    builder.append(input.optString("case_id").substring(0, Math.min(8, input.optString("case_id").length())));
-                    builder.append(" · revisão ");
-                    builder.append(input.optInt("revision"));
-                    builder.append(input.optJSONObject("dtc_read").optString("origin").equals("SIMULATED") ? " · SIMULADO" : "");
-                    button(card, builder.toString(), false, () -> this.showCase(caseDocument));
-                    i = value2;
-                }
-            }
-        }
-        if (i == 0) {
-            label(card, "Nenhuma investigação salva para o veículo selecionado. Use Investigar esta leitura após ler os códigos.", 13, this.MUTED, false);
-        }
-        if (value > 0) {
-            button(card, "Investigações de perfis removidos", false, () -> this.showRemovedProfileCases(seen));
-        }
-    }
-
-    void showRemovedProfileCases(Set set) {
-        ArrayList items = new ArrayList();
-        for (JSONObject caseDocument : this.caseDocuments) {
-            if (!set.contains(caseDocument.optJSONObject("input").optJSONObject("vehicle").optString("id"))) {
-                items.add(caseDocument);
-            }
-        }
-        chooseCaseDocuments("Perfis removidos · histórico preservado", items);
-    }
-
-    private void editCase(final DiagnosticCase diagnosticCase, final boolean flag) {
-        if (this.caseBusy) {
-            return;
-        }
-        LinearLayout linearLayout = new LinearLayout(this);
-        linearLayout.setOrientation(LinearLayout.VERTICAL);
-        linearLayout.setPadding(dp(18.0f), dp(8.0f), dp(18.0f), dp(12.0f));
-        StringBuilder builder = new StringBuilder();
-        builder.append(diagnosticCase.vehicle.name);
-        builder.append(" · ");
-        builder.append(diagnosticCase.dtc.origin == DataOrigin.SIMULATED ? "SIMULADO" : "LEITURA DO VEÍCULO");
-        label(linearLayout, builder.toString(), 14, this.ACCENT, true);
-        label(linearLayout, "Informações opcionais, declaradas por você. Salvar não faz nova leitura nem executa comandos.", 13, this.MUTED, false);
-        String[] parts = {"O que você percebeu?", "Quando ocorre?", "Com que frequência?", "Condições e observações"};
-        String[] parts2 = {diagnosticCase.symptoms.description, diagnosticCase.symptoms.when, diagnosticCase.symptoms.frequency, diagnosticCase.symptoms.conditions};
-        final EditText[] editTexts = new EditText[4];
-        for (int i = 0; i < 4; i++) {
-            label(linearLayout, parts[i], 13, this.MUTED, false);
-            EditText editText = new EditText(this);
-            editTexts[i] = editText;
-            editText.setTextColor(this.TEXT);
-            editTexts[i].setTextSize(15.0f);
-            editTexts[i].setText(parts2[i]);
-            editTexts[i].setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-            editTexts[i].setFilters(new InputFilter[]{new InputFilter.LengthFilter(2000)});
-            editTexts[i].setMinLines(2);
-            editTexts[i].setTag("case-symptom-" + i);
-            linearLayout.addView(editTexts[i]);
-        }
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(this.CARD);
-        scrollView.addView(linearLayout);
-        final AlertDialog alertDialog = new LocalizedDialog(this).setTitle(flag ? "Nova investigação" : "Revisar sintomas").setView(scrollView).setNegativeButton("Cancelar", null).setPositiveButton("Salvar caso", null).create();
-        alertDialog.setOnShowListener(new DialogInterface.OnShowListener() {
-            @Override
-            public final void onShow(DialogInterface dialogInterface) {
-                MainActivity.this.bindCaseSaveButton(alertDialog, editTexts, flag, diagnosticCase, dialogInterface);
-            }
-        });
-        alertDialog.show();
-    }
-
-    void bindCaseSaveButton(final AlertDialog alertDialog, final EditText[] editTexts, final boolean flag, final DiagnosticCase diagnosticCase, DialogInterface dialogInterface) {
-        alertDialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener((view) -> {
-            if (this.caseBusy) {
-                return;
-            }
-            try {
-                DiagnosticCase.Symptoms symptoms = new DiagnosticCase.Symptoms(editTexts[0].getText().toString(), editTexts[1].getText().toString(), editTexts[2].getText().toString(), editTexts[3].getText().toString());
-                long epochMillis = this.clock.epochMillis();
-                final DiagnosticCase savedCase = flag ? new DiagnosticCase(diagnosticCase.schemaVersion, diagnosticCase.id, 1, epochMillis, epochMillis, diagnosticCase.vehicle, diagnosticCase.adapter, diagnosticCase.dtc, diagnosticCase.telemetry, symptoms, diagnosticCase.supplement, diagnosticCase.vehicleRecord) : diagnosticCase.revise(symptoms, epochMillis);
-                this.caseBusy = true;
-                alertDialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(false);
-                alertDialog.getButton(DialogInterface.BUTTON_NEGATIVE).setEnabled(false);
-                alertDialog.setCancelable(false);
-                this.caseWorker.execute(() -> this.saveCaseInBackground(savedCase, alertDialog));
-            } catch (Exception e) {
-                message(error(e));
-            }
-        });
-    }
-
-    void saveCaseInBackground(DiagnosticCase diagnosticCase, final AlertDialog alertDialog) {
-        try {
-            this.caseStore.save(diagnosticCase);
-            final List<JSONObject> latestAll = this.caseStore.latestAll();
-            final JSONObject json = this.caseStore.load(diagnosticCase.id, diagnosticCase.revision);
-            post(() -> {
-                this.caseBusy = false;
-                this.caseDocuments = latestAll;
-                this.caseWarning = "";
-                alertDialog.dismiss();
-                render();
-                showCase(json);
-            });
-        } catch (Exception e) {
-            post(() -> {
-                this.caseBusy = false;
-                alertDialog.setCancelable(true);
-                alertDialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(true);
-                alertDialog.getButton(DialogInterface.BUTTON_NEGATIVE).setEnabled(true);
-                message("Não foi possível concluir o salvamento: " + error(e) + ". Se houve gravação antes de uma falha de consulta, reabra a lista antes de tentar novamente.");
-            });
-        }
-    }
-
-    public void showCase(final JSONObject document) {
-        try {
-            final DiagnosticCase diagnosticCase = DiagnosticCaseJson.validateDocument(document);
-            final AlertDialog[] alertDialogs = new AlertDialog[1];
-            LinearLayout linearLayout = new LinearLayout(this);
-            linearLayout.setOrientation(LinearLayout.VERTICAL);
-            linearLayout.setPadding(dp(18.0f), dp(8.0f), dp(18.0f), dp(16.0f));
-            label(linearLayout, String.join("\n", readableReport(document)), 14, this.TEXT, false);
-            button(linearLayout, "Editar sintomas / criar revisão", false, () -> {
-                alertDialogs[0].dismiss();
-                editCase(diagnosticCase, false);
-            }).setEnabled(!this.caseBusy);
-            button(linearLayout, "Consultar revisões anteriores", false, () -> this.caseWorker.execute(() -> this.loadRevisions(diagnosticCase)));
-            button(linearLayout, "Exportar investigação JSON", false, () -> exportCase(document, false));
-            button(linearLayout, "Exportar investigação TXT", false, () -> exportCase(document, "txt"));
-            button(linearLayout, "Exportar investigação PDF", false, () -> exportCase(document, true));
-            button(linearLayout, "Excluir esta investigação", false, () -> this.confirmCaseDeletion(diagnosticCase, alertDialogs));
-            ScrollView scrollView = new ScrollView(this);
-            scrollView.setBackgroundColor(this.CARD);
-            scrollView.addView(linearLayout);
-            AlertDialog dialog = new LocalizedDialog(this).setTitle("Investigação · revisão " + diagnosticCase.revision).setView(scrollView).setPositiveButton("Fechar", null).create();
-            alertDialogs[0] = dialog;
-            dialog.show();
-        } catch (Exception e) {
-            message("Não foi possível abrir o caso: " + error(e));
-        }
-    }
-
-    void loadRevisions(final DiagnosticCase diagnosticCase) {
-        try {
-            final List<JSONObject> revisions = this.caseStore.revisions(diagnosticCase.id);
-            post(() -> chooseCaseDocuments("Revisões · " + diagnosticCase.id, revisions));
-        } catch (Exception e) {
-            post(() -> message(error(e)));
-        }
-    }
-
-    void confirmCaseDeletion(final DiagnosticCase diagnosticCase, final AlertDialog[] alertDialogs) {
-        new LocalizedDialog(this).setTitle("Excluir caso e todas as revisões?").setMessage("Somente esta investigação será removida. O relatório de leitura e os outros casos serão preservados.").setNegativeButton("Cancelar", null).setPositiveButton("Excluir", (dialog, which) -> this.caseWorker.execute(() -> {
-            try {
-                this.caseStore.delete(diagnosticCase.id, diagnosticCase.vehicle.id);
-                final List<JSONObject> latestAll = this.caseStore.latestAll();
-                post(() -> {
-                    alertDialogs[0].dismiss();
-                    this.caseDocuments = latestAll;
-                    render();
-                });
-            } catch (Exception e) {
-                post(() -> message(error(e)));
-            }
-        })).show();
-    }
-
-    private void chooseCaseDocuments(String title, final List<JSONObject> list) {
-        String[] parts = new String[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            JSONObject input = list.get(i).optJSONObject("input");
-            parts[i] = input.optJSONObject("vehicle").optString("name") + " · revisão " + input.optInt("revision") + " · " + Format.when(input.optLong("revised_at_ms"));
-        }
-        new LocalizedDialog(this).setTitle(title).setItems(parts, (dialog, which) -> showCase((JSONObject) list.get(which))).setNegativeButton("Fechar", null).show();
-    }
-
-    private void exportCase(JSONObject json, boolean flag) {
-        exportCase(json, flag ? "pdf" : "json");
-    }
-
-    private void exportCase(final JSONObject json, final String text) {
-        if (this.caseExportPreparing || this.pendingCaseExport != null) {
-            message("Conclua ou cancele a exportação anterior antes de iniciar outra.");
-        } else {
-            this.caseExportPreparing = true;
-            this.caseWorker.execute(() -> {
-                try {
-                    final DiagnosticCase diagnosticCase = DiagnosticCaseJson.validateDocument(json);
-                    final File file = new File(getCacheDir(), "investigacao-" + UUID.randomUUID() + "." + text);
-                    if (text.equals("pdf")) {
-                        ReportWriter.pdf(file, readableReport(json));
-                    } else {
-                        FileOutputStream fileOutputStream = new FileOutputStream(file);
-                        try {
-                            fileOutputStream.write((text.equals("txt") ? String.join("\n", readableReport(json)) : json.toString(2)).getBytes(StandardCharsets.UTF_8));
-                            fileOutputStream.close();
-                        } catch (Throwable throwable) {
-                            try {
-                                fileOutputStream.close();
-                            } catch (Throwable throwable2) {
-                                throwable.addSuppressed(throwable2);
-                            }
-                            throw throwable;
-                        }
-                    }
-                    post(() -> this.requestCaseExportDestination(file, text, diagnosticCase));
-                } catch (Exception e) {
-                    post(() -> {
-                        this.caseExportPreparing = false;
-                        message(error(e));
-                    });
-                }
-            });
-        }
-    }
-
-    void requestCaseExportDestination(File file, String text, DiagnosticCase diagnosticCase) {
-        String type2;
-        this.caseExportPreparing = false;
-        this.pendingCaseExport = file;
-        Intent intent = new Intent("android.intent.action.CREATE_DOCUMENT").addCategory("android.intent.category.OPENABLE");
-        if (text.equals("pdf")) {
-            type2 = "application/pdf";
-        } else {
-            type2 = text.equals("txt") ? "text/plain" : "application/json";
-        }
-        Intent type = intent.setType(type2);
-        type.putExtra("android.intent.extra.TITLE", "investigacao-" + diagnosticCase.id + "-r" + diagnosticCase.revision + "." + text);
-        try {
-            startActivityForResult(type, 502);
-        } catch (Exception e) {
-            this.pendingCaseExport = null;
-            file.delete();
-            message(error(e));
-        }
     }
 
     private void shareReports(JSONArray detachedHistory) {
@@ -3082,12 +2779,6 @@ public final class MainActivity extends Activity {
             }
             runnable.run();
         });
-    }
-
-    private List<String> readableReport(JSONObject document) throws JSONException {
-        List<String> lines = new ArrayList<>(DiagnosticCaseJson.report(document));
-        lines.addAll(ReportText.referenceAppendix(DiagnosticCaseJson.decode(document.getJSONObject("input"))));
-        return ReportText.readable(lines, WallClock.zone());
     }
 
     private static final int REMINDER_PERMISSION = 702;
