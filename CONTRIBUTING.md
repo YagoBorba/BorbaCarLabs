@@ -105,7 +105,7 @@ The CI must be green before merging. Pull requests are merged with a merge commi
 When a visual change is intended, update the references and commit the new images with the change:
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests io.rea.obd.ScreenshotReferenceTest -PupdateScreenshots
+./gradlew :app:testDebugUnitTest --tests io.github.yagoborba.borbacar.ScreenshotReferenceTest -PupdateScreenshots
 ```
 
 Review the updated images before committing; they are part of the review.

@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace "io.rea.obd"
+    namespace "io.github.yagoborba.borbacar"
     compileSdk 35
 
     defaultConfig {
-        applicationId "io.rea.obd"
+        applicationId "io.github.yagoborba.borbacar"
         minSdk 26
         targetSdk 35
         versionCode 25
