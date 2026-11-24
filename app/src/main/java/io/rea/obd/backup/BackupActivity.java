@@ -33,8 +33,8 @@ public final class BackupActivity extends Activity {
         LinearLayout body = ui.column();
         body.setPadding(ui.dp(20), ui.dp(20), ui.dp(20), ui.dp(20));
         ui.title(body, t("Backup e restauração", "Backup and restore"), 25);
-        ui.label(body, t("Inclui garagem, leituras, investigações com revisões e diário. Não inclui CSV, senhas, configuração ou conversas com IA. O arquivo contém dados pessoais e não é criptografado; escolha um destino privado.",
-                "Includes garage, readings, case revisions and journal. Excludes CSV, passwords, settings and AI conversations. The file contains personal data and is not encrypted; choose a private destination."), 15, UiKit.MUTED, false);
+        ui.label(body, t("Inclui garagem, leituras, investigações com revisões e diário. Não inclui CSV, senhas nem configuração. O arquivo contém dados pessoais e não é criptografado; escolha um destino privado.",
+                "Includes garage, readings, case revisions and journal. Excludes CSV, passwords and settings. The file contains personal data and is not encrypted; choose a private destination."), 15, UiKit.MUTED, false);
         status = ui.label(body, "", 14, UiKit.ACCENT, false);
         actions = ui.column(); body.addView(actions);
         ui.button(actions, t("Criar backup", "Create backup"), true, () -> {

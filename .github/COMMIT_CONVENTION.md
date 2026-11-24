@@ -38,7 +38,6 @@ Messages are written in English, in lowercase after the colon, without emojis an
 - `reports`: JSON, TXT and PDF reports
 - `garage`: vehicle profiles and the Inmetro catalog
 - `journal`: fill-ups, services, fuel economy and reminders
-- `ai`: AI analysis contract, prompt and provider client
 
 ### Technical Scopes
 - `obd`: ELM session, OBD parser and sensor catalog
@@ -54,7 +53,7 @@ Messages are written in English, in lowercase after the colon, without emojis an
 ```bash
 feat(live): add coolant temperature to the default sensor set
 fix(connection): retry BLE notifications when the descriptor write fails
-docs: explain how to create a Gemini API key
+docs: explain how to pair a Bluetooth ELM327 adapter
 refactor(diagnosis): extract verification checklist from the rules engine
 test(journal): cover reminders for services without mileage
 chore(deps): upgrade Robolectric to 4.17
