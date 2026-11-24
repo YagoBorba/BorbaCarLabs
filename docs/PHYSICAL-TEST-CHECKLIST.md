@@ -1,4 +1,6 @@
-# Physical test checklist — not yet run
+# Physical test checklist
+
+The author tested the app on a real car with an ELM327 adapter during development. Those sessions were not recorded with this protocol, so the table below stays as the protocol for anyone who wants to repeat the test and keep the evidence.
 
 Do not fill the Result column with inferences from the simulated tests. Record the date, version/commit, phone/Android version, adapter and transport, vehicle/engine and the person responsible. Run the reading operations with the vehicle parked, in a suitable condition and with competent supervision. This protocol never asks to clear trouble codes.
 
