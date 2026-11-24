@@ -60,7 +60,7 @@ Demo mode lets you go through every screen without a car or adapter.
 ## Project Architecture
 
 - The OBD stack (`ElmSession`, `ObdReader`, `ObdParser`, `Transports`) only sends read-only queries; clearing codes lives in `EmissionCodeReset` and always asks for confirmation.
-- The rules engine and the AI receive data, never commands, and never reach the transport.
+- The rules engine receives data, never commands, and never reach the transport.
 - Every fact in a report keeps its evidence and source (`FactProvenance`, `SourceReference`).
 - Simulated data is always labeled as simulated, on screen and in reports.
 - Saved cases are recalculated and compared byte by byte when opened, so catalogs and rules used by a saved case are versioned and frozen.
@@ -105,7 +105,7 @@ The CI must be green before merging. Pull requests are merged with a merge commi
 When a visual change is intended, update the references and commit the new images with the change:
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests io.rea.obd.ScreenshotReferenceTest -PupdateScreenshots
+./gradlew :app:testDebugUnitTest --tests io.github.yagoborba.borbacar.ScreenshotReferenceTest -PupdateScreenshots
 ```
 
 Review the updated images before committing; they are part of the review.

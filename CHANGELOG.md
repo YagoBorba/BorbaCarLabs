@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 / Final version — 2026-11-24
+
+- The AI analysis was removed. BorbaCar Labs is an OBD-II reader; the AI chat came from a separate university assignment. The Talk to AI buttons, the AI settings, API keys and AI conversations are gone, and nothing leaves the phone unless you export it. Understand this reading is again the main action after a reading with codes.
+- New package and application ID `io.github.yagoborba.borbacar`. This version installs as a new app next to older versions instead of updating them.
+- Investigations (new case, revisions, opening, deleting and JSON/TXT/PDF export) moved out of `MainActivity` into `InvestigationController`, with a screen test that saves and revises a case. Clearer names replace the generic ones left in the code.
+- Gradle 8.14.8 and Robolectric 4.18.1. Dependabot is off: this is the final version of the project.
+- README with project status and download, screenshots of the current screens, and the note that the app was tested on a real car with an ELM327 adapter. The academic material about the AI was removed.
+
+
 ## 1.2.0 / Everyday use and AI chat — 2026-11-05
 
 - Friendlier AI chat: questions and replies appear as chat bubbles, each reply answers the question directly in plain language, and possible causes, missing information and what to check sit in a collapsible section under the reply. Suggestions send with one tap and change after the first answer. The raw JSON preview before every request was replaced by a plain-language notice shown once per provider ("See the data sent to the AI" stays in More options). Errors appear in the chat with "Try again" or "Set up the key".
