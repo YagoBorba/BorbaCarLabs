@@ -137,7 +137,7 @@ cd BorbaCarLabs
 The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 > [!TIP]
-> The debug build uses the package `io.rea.obd.teste` and the name "BorbaCar Labs (teste)", so it installs next to the release app without touching its data.
+> The debug build uses the package `io.github.yagoborba.borbacar.teste` and the name "BorbaCar Labs (teste)", so it installs next to the release app without touching its data.
 
 ### 3. Run the tests
 
@@ -181,7 +181,7 @@ The signature is checked with `apksigner verify` before publishing. Running the 
 ## Project Structure
 
 ```text
-app/src/main/java/io/rea/obd/
+app/src/main/java/io/github/yagoborba/borbacar/
     application/    guided reading controller
     diagnostics/    cases, rules engine, demo scenarios and formatting
     history/        case store (SQLite), reading history and JSON codecs

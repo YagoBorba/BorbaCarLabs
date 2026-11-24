@@ -1,0 +1,205 @@
+package io.github.yagoborba.borbacar.ui;
+
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import io.github.yagoborba.borbacar.diagnostics.DtcFormatter;
+import io.github.yagoborba.borbacar.diagnostics.DtcObservation;
+import io.github.yagoborba.borbacar.diagnostics.DtcReadResult;
+import io.github.yagoborba.borbacar.diagnostics.ReadingGuide;
+import io.github.yagoborba.borbacar.model.DataOrigin;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+public final class DiagnosisScreen {
+    public static final String READINESS_HINT = "Prontidão dos monitores: quais autotestes de emissões o carro já concluiu desde que os códigos foram apagados ou a bateria desligada.";
+    public static final String FREEZE_FRAME_HINT = "Quadro congelado: valores dos sensores gravados pelo carro no instante em que a falha foi registrada.";
+
+    private DiagnosisScreen() {
+    }
+
+    public static final class Headline {
+        public final String title;
+        public final String detail;
+        public final boolean clean;
+        public final boolean hasCodes;
+        public final boolean milOn;
+
+        Headline(DtcReadResult read) {
+            Set<String> codes = new LinkedHashSet<>();
+            for (DtcObservation observation : read.observations()) {
+                codes.add(observation.code);
+            }
+            boolean mil = false;
+            for (DtcReadResult.MilObservation observation : read.mil.observations) {
+                mil |= observation.illuminated;
+            }
+            this.milOn = mil;
+            this.hasCodes = !codes.isEmpty();
+            this.clean = codes.isEmpty() && !read.incomplete();
+            if (!codes.isEmpty()) {
+                this.title = Format.count(codes.size(), "código de falha encontrado", "códigos de falha encontrados");
+                this.detail = String.join(" · ", codes);
+            } else if (read.incomplete()) {
+                this.title = "Leitura incompleta";
+                this.detail = "Nem todas as consultas responderam. Veja os detalhes ou leia novamente.";
+            } else {
+                this.title = "Nenhum código de falha";
+                this.detail = "A ECU respondeu a todas as consultas sem registrar códigos.";
+            }
+        }
+    }
+
+    public static Headline headline(DtcReadResult read) {
+        return new Headline(read);
+    }
+
+    public static LinearLayout verdict(LinearLayout parent, DtcReadResult read, boolean compact) {
+        UiKit ui = new UiKit(parent.getContext());
+        Headline headline = headline(read);
+        boolean clean = headline.clean;
+        boolean milOn = headline.milOn;
+        String title = headline.title;
+        String detail = headline.detail;
+
+        LinearLayout card = ui.card(parent, !clean);
+        LinearLayout header = new LinearLayout(parent.getContext());
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        header.addView(badge(ui, clean), new LinearLayout.LayoutParams(ui.dp(44), ui.dp(44)));
+        LinearLayout heading = ui.column();
+        heading.setPadding(ui.dp(14), 0, 0, 0);
+        header.addView(heading, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        String when = (read.origin == DataOrigin.SIMULATED ? "DEMONSTRAÇÃO · " : "LEITURA ") + Format.when(read.completedAtEpochMillis);
+        ui.eyebrow(heading, when.toUpperCase(java.util.Locale.ROOT));
+        ui.label(heading, title, compact ? 19 : 22, UiKit.TEXT, true).setPadding(0, 0, 0, 0);
+
+        ui.label(card, detail, 15, headline.hasCodes ? UiKit.TEXT : UiKit.MUTED, headline.hasCodes).setPadding(0, ui.dp(12), 0, ui.dp(4));
+        if (milOn) {
+            ui.label(card, "Luz de injeção (MIL) acesa no painel", 14, UiKit.AMBER, true);
+        }
+        if (headline.hasCodes && read.incomplete()) {
+            ui.label(card, "Algumas consultas não terminaram; pode haver outros códigos.", 13, UiKit.AMBER, false);
+        }
+        if (!compact) {
+            ui.label(card, "Cobre o diagnóstico de emissões (OBD2). Módulos como ABS e airbag não são lidos.", 12, UiKit.MUTED, false);
+        }
+        return card;
+    }
+
+    private static TextView badge(UiKit ui, boolean clean) {
+        TextView badge = new TextView(ui.context);
+        badge.setText(clean ? "✓" : "!");
+        badge.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 22.0f);
+        badge.setGravity(Gravity.CENTER);
+        badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        int tone = clean ? ui.palette.accent : ui.palette.attention;
+        badge.setTextColor(tone);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor((tone & 0x00FFFFFF) | 0x26000000);
+        badge.setBackground(circle);
+        badge.setImportantForAccessibility(TextView.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return badge;
+    }
+
+    public interface CodeAction {
+        void open(String code);
+    }
+
+    public static void explanation(LinearLayout parent, DtcReadResult read, CodeAction sources) {
+        UiKit ui = new UiKit(parent.getContext());
+        ui.eyebrow(parent, "O QUE A LEITURA MOSTROU");
+        for (String line : ReadingGuide.context(read)) {
+            ui.label(parent, line, 14, line.startsWith("Algumas") ? UiKit.AMBER : UiKit.TEXT, false);
+        }
+        for (ReadingGuide.Code code : ReadingGuide.codes(read)) {
+            LinearLayout card = ui.card(parent, false);
+            card.setTag("explanation-" + code.code);
+            ui.label(card, code.code, 24, UiKit.AMBER, true);
+            ui.label(card, code.statuses(), 13, UiKit.MUTED, true);
+            ui.label(card, code.meaning == null ? ReadingGuide.NO_MEANING : code.meaning, 15, code.meaning == null ? UiKit.MUTED : UiKit.TEXT, code.meaning != null);
+            if (code.structure != null) {
+                ui.label(card, code.structure, 13, UiKit.ACCENT, true);
+            }
+            io.github.yagoborba.borbacar.knowledge.DtcGuidance guidance = io.github.yagoborba.borbacar.knowledge.DtcGuidance.of(code.code);
+            ui.eyebrow(card, "POSSO CONTINUAR RODANDO?");
+            ui.label(card, guidance.headline(), 15, guidance.urgent() ? UiKit.AMBER : UiKit.TEXT, true);
+            ui.label(card, guidance.advice, 13, UiKit.TEXT, false);
+            if (!guidance.causes.isEmpty()) {
+                ui.eyebrow(card, "CAUSAS COMUNS · NÃO CONFIRMADAS");
+                for (String cause : guidance.causes) {
+                    ui.label(card, "• " + cause, 13, UiKit.TEXT, false);
+                }
+            }
+            ui.eyebrow(card, "EVIDÊNCIA");
+            for (String line : code.evidence()) {
+                ui.label(card, line, 13, UiKit.TEXT, false);
+            }
+            if (code.question != null) {
+                ui.label(card, "Pergunta de contexto: " + code.question, 13, UiKit.MUTED, false);
+            }
+            ui.button(card, "Fontes de " + code.code, false, () -> sources.open(code.code));
+        }
+        ui.eyebrow(parent, "PRÓXIMOS PASSOS");
+        for (String line : ReadingGuide.nextSteps()) {
+            ui.label(parent, "• " + line, 14, UiKit.TEXT, false);
+        }
+        ui.label(parent, ReadingGuide.SCOPE, 12, UiKit.MUTED, false);
+    }
+
+    public static void shortcuts(LinearLayout parent, Runnable openLive, Runnable openHistory) {
+        UiKit uiKit = new UiKit(parent.getContext());
+        LinearLayout column = uiKit.column();
+        boolean sideBySide = parent.getResources().getConfiguration().fontScale <= 1.3f;
+        column.setOrientation(sideBySide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        parent.addView(column, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        Button liveButton = uiKit.button(column, "Ao vivo", false, openLive);
+        Button historyButton = uiKit.button(column, "Investigações e histórico", false, openHistory);
+        if (sideBySide) {
+            LinearLayout.LayoutParams liveParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            liveParams.setMargins(0, 0, uiKit.dp(8), uiKit.dp(16));
+            liveButton.setLayoutParams(liveParams);
+            LinearLayout.LayoutParams historyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            historyParams.bottomMargin = uiKit.dp(16);
+            historyButton.setLayoutParams(historyParams);
+        }
+    }
+
+    public static void progress(LinearLayout parent, int completedSteps, String guidedStatus) {
+        UiKit uiKit = new UiKit(parent.getContext());
+        uiKit.label(parent, guidedStatus, 14, UiKit.TEXT, true);
+        if (completedSteps < 2) {
+            ProgressBar progressBar = new ProgressBar(parent.getContext(), null, android.R.attr.progressBarStyleHorizontal);
+            progressBar.setIndeterminate(false);
+            progressBar.setMax(2);
+            progressBar.setProgress(completedSteps);
+            progressBar.setProgressTintList(ColorStateList.valueOf(uiKit.palette.accent));
+            progressBar.setContentDescription(I18n.t(completedSteps + " de 2 grupos de consultas encerrados"));
+            parent.addView(progressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, uiKit.dp(8)));
+        }
+    }
+
+    public static void results(LinearLayout linearLayout, DtcReadResult dtcReadResult) {
+        if (dtcReadResult == null) {
+            return;
+        }
+        UiKit uiKit = new UiKit(linearLayout.getContext());
+        uiKit.section(linearLayout, "Resultado por serviço", "Uma resposta sem códigos não exclui outros problemas no veículo.");
+        for (DtcReadResult.ServiceResult serviceResult : dtcReadResult.services) {
+            LinearLayout card = uiKit.card(linearLayout, false);
+            uiKit.eyebrow(card, DtcFormatter.category(serviceResult.category));
+            uiKit.label(card, (serviceResult.status.outcome != DtcReadResult.Outcome.POSITIVE && serviceResult.observations.isEmpty()) ? "—" : Integer.toString(serviceResult.observations.size()), 28, UiKit.TEXT, true);
+            uiKit.label(card, DtcFormatter.outcome(serviceResult.status.outcome), 14, UiKit.MUTED, false);
+            uiKit.label(card, serviceResult.status.completedAtEpochMillis == null ? "Sem horário de leitura" : "Lida " + Format.when(serviceResult.status.completedAtEpochMillis.longValue()), 12, UiKit.MUTED, false);
+        }
+    }
+}
