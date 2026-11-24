@@ -55,16 +55,6 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 
 </div>
 
-<div align="center">
-
-| AI chat |
-|---|
-| <img src="docs/screens/ai-chat.png" width="320" alt="Chat with the AI about a demo reading" /> |
-
-<sub>Simulated conversation about a demo reading, rendered by `AiAssistantScreenTest` without calling any provider. Portuguese version: [docs/telas/ia-conversa.png](docs/telas/ia-conversa.png).</sub>
-
-</div>
-
 ## What Can BorbaCar Labs Do?
 
 - **Adapter Connection:**
@@ -91,26 +81,20 @@ The project started as an academic work on vehicle diagnostics. Instead of only 
 - **Maintenance Reminders:**
     Daily notification when a service logged in the journal is within 7 days or 500 km of being due.
 
-- **AI Analysis with your own key:**
-    Case-scoped conversations with Gemini or Claude, called directly from the phone with your own API key (encrypted with the Android Keystore). Suggested questions, a preview of exactly what is sent, replies that must cite the evidence they rely on, and sharing with any AI app instead. The offline guide is labeled as rules, not AI.
-
 - **Demo Mode:**
     Explore every screen without a car, with simulated data clearly marked.
 
 - **English and Portuguese:**
-    Choose the language in Settings or follow the phone's language. Screens, dialogs, reminders, reports and the AI answer switch together; saved cases stay unchanged.
+    Choose the language in Settings or follow the phone's language. Screens, dialogs, reminders and reports switch together; saved cases stay unchanged.
 
 ## Under the Hood (Main Technologies)
 
 - **[Java 17](https://openjdk.org/) & [Android SDK](https://developer.android.com/):** Native app with views built in code, min SDK 26 and target SDK 35.
 - **[ELM327](https://www.elmelectronics.com/) over SPP, BLE and TCP:** Transport layer for the adapter, isolated behind `ElmTransport`.
-- **[SQLite](https://developer.android.com/training/data-storage/sqlite):** Local storage for diagnostic cases and the journal; external sharing and AI requests require an explicit user action.
+- **[SQLite](https://developer.android.com/training/data-storage/sqlite):** Local storage for diagnostic cases and the journal; nothing leaves the phone without an explicit user action.
 - **[PdfDocument](https://developer.android.com/reference/android/graphics/pdf/PdfDocument):** Paginated PDF reports with sections and a simulated-data banner.
 - **[JUnit 4](https://junit.org/junit4/) & [Robolectric](https://robolectric.org/):** JVM tests for the OBD stack and screen tests with the real `MainActivity`.
-- **[Gemini API](https://ai.google.dev/gemini-api/docs) & [Claude API](https://platform.claude.com/docs):** Called over HTTPS with `HttpURLConnection` and structured JSON output; keys sealed with the [Android Keystore](https://developer.android.com/privacy-and-security/keystore).
 - **[GitHub Actions](https://github.com/features/actions) & [Dependabot](https://docs.github.com/en/code-security/dependabot):** Build, tests, lint, signed releases and dependency updates.
-
-**Development snapshot:** AI with your own key, academic AI conversations and restorable backups are in development; the release badge refers to the last published version. Backups include garage, readings, case revisions and journal, with validation, undo and crash recovery. They exclude credentials, settings, CSV and AI conversations.
 
 ## Architecture
 
@@ -125,11 +109,9 @@ flowchart LR
     K[DtcCatalog with sources + DtcStructure SAE J2012] --> DC
     DC --> H[DiagnosticCaseStore / HistoryStore SQLite]
     DC --> R[JSON, TXT and PDF reports]
-    DC --> AR[Minimized AnalysisRequest] -.HTTPS, user's key.-> S[Gemini or Claude API]
-    S -.-> AV[Validated AnalysisResult]
 ```
 
-The rules engine and the AI never touch the transport: they receive data, not commands. Clearing trouble codes lives in its own class and always asks for confirmation.
+The rules engine never touches the transport: it receives data, not commands. Clearing trouble codes lives in its own class and always asks for confirmation.
 
 ## Getting Started
 
@@ -138,7 +120,6 @@ The rules engine and the AI never touch the transport: they receive data, not co
 - **[JDK 17+](https://adoptium.net/)**
 - **[Android SDK](https://developer.android.com/studio)** with platform 35 (Android Studio or command line tools)
 - An ELM327 adapter to read a real car (optional: demo mode works without one)
-- A [Gemini](https://aistudio.google.com/apikey) or [Claude](https://platform.claude.com/settings/keys) API key to try the AI analysis (optional)
 
 ### 1. Clone the repository
 
@@ -164,21 +145,7 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 ./gradlew testDebugUnitTest lintDebug
 ```
 
-### 4. Set up AI analysis (optional)
-
-The app talks to the AI provider directly; no computer or server is involved.
-
-1. Create an API key:
-   - **Gemini:** [Google AI Studio](https://aistudio.google.com/apikey). There is usually a free quota; on the free tier Google may use the submitted content to improve its products.
-   - **Claude:** [Claude Console](https://platform.claude.com/settings/keys). The API uses prepaid credits; a Claude app subscription is not an API key.
-2. In the app, open **Settings › AI analysis**, choose the provider, paste the key and tap **Save and test key**. The test checks the key and model without generating text, so it uses no credits.
-3. Choose **Talk to AI** from a reading or a saved investigation. Each question shows a preview of exactly what will be sent.
-
-The key is encrypted with an Android Keystore key and only sent to the chosen provider. **Advanced** lets you change the model (defaults: `gemini-3.5-flash-lite` and `claude-sonnet-5-5`) and set a workspace ID for Claude keys without one. Usage may be billed to your provider account.
-
-Without a key, **Use my AI** shares the reviewed question with any AI app on the phone, and **Offline guide · no AI** works with no model at all.
-
-### 5. Signed release
+### 4. Signed release
 
 Copy `keystore.properties.example` to `keystore.properties` (ignored by Git), fill it with the app certificate and run:
 
@@ -196,7 +163,7 @@ The CI pipeline runs on every pull request and on every push to `main` and `deve
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
 
-- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout, reminders and the AI contract (data minimization, personal data filter, dropping of invented evidence, fallback to another model when one is busy, encrypted key storage and a local fake that answers like the Gemini and Claude APIs; no real provider is called).
+- **JVM tests:** a `FakeAdapter` plays scripted ELM327 responses to cover the ELM session, OBD parser, `ObdReader`, the bundled catalogs, journal round trips, fuel economy, DTC structure, report formatting and layout and reminders.
 - **Screen tests:** Robolectric opens the real `MainActivity`, walks through every main screen and a scenario with a vehicle profile, journal and a demo reading, saving the screenshots in Portuguese; `EnglishScreensTest` does the same in English and fails if any text is left untranslated.
 - **Lint:** no errors; the report, test results, screenshots and APK are uploaded as workflow artifacts.
 
@@ -215,7 +182,6 @@ The signature is checked with `apksigner verify` before publishing. Running the 
 
 ```text
 app/src/main/java/io/rea/obd/
-    ai/             AI request, prompt, provider client, key storage and validation
     application/    guided reading controller
     diagnostics/    cases, rules engine, demo scenarios and formatting
     history/        case store (SQLite), reading history and JSON codecs
@@ -231,15 +197,13 @@ app/src/main/java/io/rea/obd/
 app/src/test/       JVM and Robolectric tests
 tools/              catalog generation from the official sources
 docs/               privacy notice, physical test checklist, screenshots,
-                    academic material (pt-BR) and project history (pt-BR)
+                    and project history (pt-BR)
 ```
 
 ## Limitations
 
 - Generic OBD-II emissions diagnostics only; ABS, airbag and manufacturer-specific modules are not read.
 - Code meanings only for codes in the catalog; other codes show their system area with no presumed cause.
-- The AI suggests possibilities, not a diagnosis. Up to eight turns per case revision are stored separately on the device; replies never change diagnostic facts, rules or reports.
-- AI requests use the user's own key and quota; the app has no accounts, shared quota or billing of its own.
 - Not yet verified on a real car and adapter, or PDF rendering on a physical device.
 
 ## Documentation
@@ -251,10 +215,9 @@ docs/               privacy notice, physical test checklist, screenshots,
 | [docs/PHYSICAL-TEST-CHECKLIST.md](docs/PHYSICAL-TEST-CHECKLIST.md) | Pending real-device and adapter validation |
 | [tools/README.md](tools/README.md) | Catalog generation from the sources |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](.github/SECURITY.md) | How to contribute and report vulnerabilities |
-| [docs/academic/](docs/academic/README.md) | Academic material in Brazilian Portuguese: research question, AI setup, presentation guide and evaluation |
 | [docs/historico/](docs/historico/README.md) | Project history in Brazilian Portuguese: master plan, architecture, contracts, catalogs and validation of every version since 0.3.0 |
 
-The code, the repository documents and the commit history are in English. The academic material and the project history are kept in Brazilian Portuguese, the language of the course this project was built for. The app itself is available in both languages.
+The code, the repository documents and the commit history are in English. The project history is kept in Brazilian Portuguese. The app itself is available in both languages.
 
 ## Contributing
 

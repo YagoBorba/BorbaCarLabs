@@ -10,8 +10,6 @@ Do not fill the Result column with inferences from the simulated tests. Record t
 | Guided reading | State per service; missing data distinct from a fault | Pending |
 | Connection lost and restored | Old data identified; new session without mixing | Pending |
 | Rotation, pause and return | Consistent state and identified recording | Pending |
-| Real AI conversation (Gemini and Claude) | Key test, model, preview, latency and references; human review | Pending |
-| No internet or invalid key | Recoverable message and identified offline guide | Pending |
 | PDF in the phone's viewer | Pagination, accents, simulation band | Pending |
 | Backup through the Android picker | File saved to a private destination | Pending |
 | Restore on a test install | Same profiles, readings, cases and journal revisions | Pending |
